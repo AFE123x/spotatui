@@ -991,17 +991,18 @@ impl Network {
     first_track: Box<Option<FullTrack>>,
     country: Option<Country>,
   ) {
-    let empty_payload: Map<String, Value> = Map::new();
+    let market = country.map(Market::Country);
+    let seed_genres: Option<Vec<&str>> = None;
 
     match self
       .spotify
       .recommendations(
-        seed_artists,                  // artists
-        None,                          // genres
-        seed_tracks,                   // tracks
-        Some(self.large_search_limit), // adjust playlist to screen size
-        country,                       // country
-        Some(&empty_payload),          // payload
+        [],                            // attributes (empty for now)
+        seed_artists,                  // seed_artists
+        seed_genres,                   // seed_genres
+        seed_tracks,                   // seed_tracks
+        market,                        // market
+        Some(self.large_search_limit), // limit
       )
       .await
     {
@@ -1014,8 +1015,12 @@ impl Network {
 
           let track_ids = recommended_tracks
             .iter()
-            .filter_map(|x| x.id.as_ref().map(|id| id.uri()))
-            .collect::<Vec<String>>();
+            .filter_map(|x| {
+              x.id
+                .as_ref()
+                .map(|id| PlayableId::Track(id.clone().into_static()))
+            })
+            .collect::<Vec<PlayableId>>();
 
           self.set_tracks_to_table(recommended_tracks.clone()).await;
 
@@ -1043,10 +1048,10 @@ impl Network {
     let track_ids = recommendations
       .tracks
       .iter()
-      .filter_map(|track| track.id)
+      .filter_map(|track| track.id.as_ref().map(|id| id.clone()))
       .collect::<Vec<TrackId>>();
 
-    if let Ok(Some(result)) = self.spotify.tracks(track_ids, None).await.map(Some) {
+    if let Ok(result) = self.spotify.tracks(track_ids, None).await {
       return Some(result);
     }
 
@@ -1059,7 +1064,7 @@ impl Network {
     country: Option<Country>,
   ) {
     if let Ok(track) = self.spotify.track(track_id.clone(), None).await {
-      let track_id_list = vec![track_id];
+      let track_id_list = vec![track_id.into_static()];
       self
         .get_recommendations_for_seed(None, Some(track_id_list), Box::new(Some(track)), country)
         .await;
