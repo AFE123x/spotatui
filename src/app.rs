@@ -707,18 +707,24 @@ impl App {
     {
       match item {
         PlayableItem::Track(track) => {
-          if let Err(e) = clipboard.set_text(format!(
-            "https://open.spotify.com/track/{}",
-            track.id.to_owned().unwrap_or_default()
-          )) {
-            self.handle_error(anyhow!("failed to set clipboard content: {}", e));
+          let track_id = track.id.as_ref().map(|id| id.id().to_string());
+
+          match track_id {
+            Some(id) if !id.is_empty() => {
+              if let Err(e) = clipboard.set_text(format!("https://open.spotify.com/track/{}", id)) {
+                self.handle_error(anyhow!("failed to set clipboard content: {}", e));
+              }
+            }
+            _ => {
+              self.handle_error(anyhow!("Track has no ID"));
+            }
           }
         }
         PlayableItem::Episode(episode) => {
-          if let Err(e) = clipboard.set_text(format!(
-            "https://open.spotify.com/episode/{}",
-            episode.id.to_owned()
-          )) {
+          let episode_id = episode.id.id().to_string();
+          if let Err(e) =
+            clipboard.set_text(format!("https://open.spotify.com/episode/{}", episode_id))
+          {
             self.handle_error(anyhow!("failed to set clipboard content: {}", e));
           }
         }
@@ -738,18 +744,22 @@ impl App {
     {
       match item {
         PlayableItem::Track(track) => {
-          if let Err(e) = clipboard.set_text(format!(
-            "https://open.spotify.com/album/{}",
-            track.album.id.to_owned().unwrap_or_default()
-          )) {
-            self.handle_error(anyhow!("failed to set clipboard content: {}", e));
+          let album_id = track.album.id.as_ref().map(|id| id.id().to_string());
+
+          match album_id {
+            Some(id) if !id.is_empty() => {
+              if let Err(e) = clipboard.set_text(format!("https://open.spotify.com/album/{}", id)) {
+                self.handle_error(anyhow!("failed to set clipboard content: {}", e));
+              }
+            }
+            _ => {
+              self.handle_error(anyhow!("Album has no ID"));
+            }
           }
         }
         PlayableItem::Episode(episode) => {
-          if let Err(e) = clipboard.set_text(format!(
-            "https://open.spotify.com/show/{}",
-            episode.show.id.to_owned()
-          )) {
+          let show_id = episode.show.id.id().to_string();
+          if let Err(e) = clipboard.set_text(format!("https://open.spotify.com/show/{}", show_id)) {
             self.handle_error(anyhow!("failed to set clipboard content: {}", e));
           }
         }
