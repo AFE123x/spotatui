@@ -80,6 +80,7 @@
 - ✅ Updated `arboard` to 3.4
 - ✅ Updated `dirs` to 5.0
 - ✅ Updated `serde_yaml` to 0.9
+- ✅ Added `chrono` 0.4.42 so `seek_track` can convert milliseconds via `TimeDelta`.
 - ✅ Added a direct `futures` dependency for `StreamExt` helpers in `network.rs`
 
 ### Global Type Renames (All `.rs` files)
@@ -125,17 +126,16 @@
 - ✅ `IoEvent` payloads and CLI dispatch now pass typed IDs end-to-end.
 - ✅ `get_current_playback` now dispatches `CurrentUserSavedTracksContains(vec![track_id.into_static()])`.
 - ✅ `set_tracks_to_table` converts every `FullTrack.id` into `TrackId<'static>` before dispatching `CurrentUserSavedTracksContains`.
-- 🔶 Handler modules still emit string IDs when queueing IoEvents; `playlist.rs` and `recently_played.rs` have been migrated, but `track_table.rs`, `album_tracks.rs`, `playbar.rs`, `artist.rs`, `search_results.rs`, `input.rs`, and `podcasts.rs` all need the same `.into_static()` helpers.
+- 🔶 Handler modules still emit string IDs when queueing IoEvents; `playlist.rs`, `recently_played.rs`, and the show add/remove helpers in `app.rs` now emit typed IDs, but `track_table.rs`, `album_tracks.rs`, `playbar.rs`, `artist.rs`, `search_results.rs`, `input.rs`, and `podcasts.rs` still need `.into_static()` conversions.
 
 #### Stream-returning rspotify APIs
-- 🔶 **IN PROGRESS**: `playlist_items_manual` is now the default for both `get_playlist_tracks` and `get_made_for_you_playlist_tracks`, so we preserve Spotify's metadata and respect offset/limit without buffering entire playlists. Finish migrating the remaining callers:
-  - ❌ `artist_albums` and `current_user_playlists` (the ones inside `try_join!`) still assume the pre-stream API.
-  - ❌ Search endpoints need to be revisited—the `(market, limit)` arguments changed order/types in 0.12.
-  - ❌ Podcast/show endpoints require the same stream treatment once we settle on the new APIs.
+- ✅ Playlist fetchers (`get_playlist_tracks`, `get_made_for_you_playlist_tracks`), saved-track/album lists, artist albums, show episodes, and saved shows now call the explicit `*_manual` endpoints; `StreamExt` is no longer used in `network.rs`.
+- 🔶 Need to double-check every search/podcast caller (including CLI helpers) now that `search` takes `(query, types, market, limit, offset, include_external)`; some UI handlers still expect the old ordering/shape.
 
 #### Show & Podcast library APIs
-- ❌ `current_user_saved_shows` was removed upstream; `src/network.rs:480-494` has to be rewritten against the new `users_saved_shows` endpoints or dropped temporarily.
-- ❌ Saved-show helpers (`CurrentUserSavedShowsContains`, add/remove) still assume string IDs and the old method names; align them after the new endpoint is chosen.
+- ✅ `get_current_user_saved_shows` uses `get_saved_show_manual` so pagination works again.
+- ✅ `current_user_saved_shows_contains`/add/remove paths now call `check_users_saved_shows`, `save_shows`, and `remove_users_saved_shows` with typed IDs (including episode toggle logic).
+- 🔶 Podcast/saved-show UI handlers still push string IDs through `IoEvent`s; finish the `.into_static()` conversions (see `src/handlers/podcasts.rs` + `App` list helpers).
 
 #### UI Ratatui Follow-ups
 - ✅ All draw helpers now use `Frame<'_>`; Backend bounds removed.
@@ -169,6 +169,9 @@
 - ❌ Update error handling for new rspotify error types
 - ❌ Test error scenarios and ensure proper user feedback
 
+#### Dependency Cleanup
+- ❌ Remove the `futures` dependency if no code uses `StreamExt` anymore (manual pagination replaced the old streams).
+
 #### Testing & Validation
 - ❌ Test OAuth flow end-to-end
 - ❌ Test playback controls
@@ -184,8 +187,8 @@
 ## Known Issues & Blockers
 
 ### Compilation Errors (Current)
-- **Stream migration gaps**: playlist fetchers now respect offsets, but artist/library calls still rely on the removed paginator helpers and won't compile until they're ported.
-- **Removed show endpoints**: `rspotify` 0.12 dropped `current_user_saved_shows`, so the call at `src/network.rs:480-494` no longer exists—saved-show fetching needs to be rewritten against the new endpoints before the tree compiles again.
+- **`CurrentPlaybackContext` drift**: `src/app.rs:452-607` still references `duration_ms`, `progress_ms`, and treats `device.volume_percent` as a plain integer. rspotify 0.12 now exposes `duration`/`progress` as `Option<Duration>` and `volume_percent` as `Option<u32>`, so all playback/seek helpers need to work with the new types.
+- **Track ID copy helpers**: `src/app.rs:699-715` still call `.unwrap_or_default()` on `TrackId`, which no longer implements `Default`. Convert to `track.id.as_ref().map(|id| id.id())` before formatting URLs.
 
 ### Design Decisions Needed
 1. Do we store typed IDs (`TrackId`, `AlbumId`, …) inside `App`/UI state, or do we continue storing Strings and convert at the rspotify call sites?
@@ -201,15 +204,15 @@
 | --------------------- | --------------- | ----------------------------------------------------------------------------------------------- |
 | `Cargo.toml`          | ✅ Updated       | Dependencies modernized                                                                         |
 | `src/main.rs`         | ✅ Updated       | Async bootstrap, token cache handling, and UI/CLI dispatch now compile + run.                   |
-| `src/network.rs`      | 🔶 Partial       | Typed track IDs now flow through `CurrentUserSavedTracksContains`; playlist fetchers use manual pagination. Still need saved-shows + artist/podcast stream rewrites. |
+| `src/network.rs`      | 🔶 Partial       | Typed track IDs flow through `CurrentUserSavedTracksContains`; playlist fetchers use manual pagination; saved-show APIs fully migrated. Still need artist/podcast stream rewrites. |
 | `src/redirect_uri.rs` | ✅ Updated       | Callback helper converted; unused `spotify` arg is the only warning.                            |
 | `src/config.rs`       | ⚠️ Unknown       | May need updates for new OAuth                                                                  |
-| `src/app.rs`          | ✅ Types updated | Model types renamed                                                                             |
+| `src/app.rs`          | 🔶 Needs update | Still assumes `duration_ms`/`progress_ms` + string IDs; update for rspotify 0.12 models          |
 
 ### Handler Files
 | File                | Status          | Notes                                                              |
 | ------------------- | --------------- | ------------------------------------------------------------------ |
-| `src/handlers/*.rs` | ✅ Types updated | `playlist.rs` + `recently_played.rs` emit typed IDs; rest still pending |
+| `src/handlers/*.rs` | 🔶 Partial       | `playlist.rs`, `recently_played.rs`, and show add/remove flows emit typed IDs; `track_table.rs`, `album_tracks.rs`, `artist.rs`, `search_results.rs`, `input.rs`, and `podcasts.rs` still pending |
 
 ### UI Files
 | File                       | Status     | Notes                                                                                 |
@@ -229,9 +232,9 @@
 ## Next Steps
 
 ### Immediate Actions (to get it compiling)
-1. ❌ Fix the remaining `src/network.rs` compile errors: emit typed IDs when dispatching `CurrentUserSavedTracksContains`, remove the bogus `.await` on the playlist paginator, and decide how to fetch saved shows now that `current_user_saved_shows` is gone.
-2. ❌ Finish the playlist/paginator migration: use `playlist_items_manual` (or manual chunking) for both regular playlists and "Made for You" so offsets, totals, and memory usage stay sane; port `artist_albums` / `current_user_playlists` next.
-3. ❌ Typed-ID dispatch conversions: Update `src/app.rs` plus every handler (`track_table.rs`, `album_tracks.rs`, `recently_played.rs`, etc.) to call `.from_id(...).into_static()` before they enqueue IoEvents like `StartPlayback`, `AddItemToQueue`, `ToggleSaveTrack`, etc.
+1. ❌ Update `src/app.rs` to the new rspotify playback models: replace every `duration_ms`/`progress_ms` access with the `Duration`-based fields, handle `device.volume_percent: Option<u32>`, and stop calling `.unwrap_or_default()` on typed IDs when building URLs.
+2. ❌ Finish the typed-ID conversions in the remaining handlers (`track_table.rs`, `album_tracks.rs`, `artist.rs`, `search_results.rs`, `input.rs`, `podcasts.rs`) so every IoEvent payload carries `TrackId<'static>`/`PlayableId`.
+3. ❌ Re-test search/podcast flows (CLI + UI) with the new pagination + `Market` arguments; update any lingering call sites that still expect the pre-0.12 `search` signature and drop the now-unused `futures` dependency once confirmed.
 
 ### Short Term (to get it working)
 1. Re-test every `Network` API method once typed-ID dispatch & stream handling compile; ensure logging/error propagation is aligned with new APIs.
