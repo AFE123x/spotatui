@@ -1758,6 +1758,7 @@ dependencies = [
  "anyhow",
  "arboard",
  "backtrace",
+ "chrono",
  "clap",
  "crossterm",
  "dirs",
