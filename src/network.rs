@@ -583,7 +583,7 @@ impl Network {
     let search_track = self.spotify.search(
       &search_term,
       SearchType::Track,
-      market,
+      market.clone(),
       None, // include_external
       Some(self.small_search_limit),
       Some(0),
@@ -592,7 +592,7 @@ impl Network {
     let search_artist = self.spotify.search(
       &search_term,
       SearchType::Artist,
-      market,
+      market.clone(),
       None, // include_external
       Some(self.small_search_limit),
       Some(0),
@@ -601,7 +601,7 @@ impl Network {
     let search_album = self.spotify.search(
       &search_term,
       SearchType::Album,
-      market,
+      market.clone(),
       None, // include_external
       Some(self.small_search_limit),
       Some(0),
@@ -610,7 +610,7 @@ impl Network {
     let search_playlist = self.spotify.search(
       &search_term,
       SearchType::Playlist,
-      market,
+      market.clone(),
       None, // include_external
       Some(self.small_search_limit),
       Some(0),
