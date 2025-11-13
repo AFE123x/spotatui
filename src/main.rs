@@ -204,40 +204,68 @@ of the app. Beware that this comes at a CPU cost!",
 
   let config_port = client_config.get_port();
 
-  // Attempt to read token from cache.
-  // Gracefully handle missing cache file - read_token_cache returns Ok(None) if file doesn't exist
+  // Attempt to read token from cache and validate it
+  // read_token_cache(true) will attempt to refresh if expired
   let token_result = spotify.read_token_cache(true).await;
-  let has_cached_token = match token_result {
-    Ok(Some(_)) => true,
-    Ok(None) => false,
-    Err(_) => false, // Treat cache read errors as "no token"
+  let needs_auth = match token_result {
+    Ok(Some(_)) => {
+      // Token was read from cache, but we should verify it's actually valid
+      // by checking if the token field is populated
+      let token_lock = spotify.token.lock().await.expect("Failed to lock token");
+      let has_valid_token = token_lock.is_some();
+      drop(token_lock);
+      !has_valid_token
+    }
+    Ok(None) => true, // No cached token
+    Err(_) => true,   // Cache read/refresh failed
   };
 
-  if !has_cached_token {
+  if needs_auth {
     // If token is not in cache, get it from web flow
+    // Get the authorization URL first
+    let auth_url = spotify.get_authorize_url(false)?;
+
+    // Try to open the URL in the browser
+    println!("\nAttempting to open this URL in your browser:");
+    println!("{}\n", auth_url);
+
+    if let Err(e) = open::that(&auth_url) {
+      println!("Failed to open browser automatically: {}", e);
+      println!("Please manually open the URL above in your browser.");
+    }
+
+    println!(
+      "Waiting for authorization callback on http://127.0.0.1:{}...\n",
+      config_port
+    );
+
     match redirect_uri_web_server(&mut spotify, config_port) {
       Ok(url) => {
         if let Some(code) = spotify.parse_response_code(&url) {
           spotify.request_token(&code).await?;
+          println!("✓ Successfully authenticated with Spotify!");
+        } else {
+          return Err(anyhow!(
+            "Failed to parse authorization code from callback URL"
+          ));
         }
       }
       Err(()) => {
         println!("Starting webserver failed. Continuing with manual authentication");
-        let url = spotify.get_authorize_url(false)?;
-        println!("Please open this URL in your browser: {}", url);
+        println!("Please open this URL in your browser: {}", auth_url);
         println!("Enter the URL you were redirected to: ");
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         if let Some(code) = spotify.parse_response_code(&input) {
           spotify.request_token(&code).await?;
+        } else {
+          return Err(anyhow!("Failed to parse authorization code from input URL"));
         }
       }
     }
   }
 
-  // The client is now authenticated and ready to be used.
-  // The token will be automatically refreshed by rspotify.
-  // Access the token to get expiry time
+  // Verify that we have a valid token before proceeding
   let token_lock = spotify.token.lock().await.expect("Failed to lock token");
   let token_expiry = if let Some(ref token) = *token_lock {
     // Convert TimeDelta to SystemTime
@@ -246,8 +274,8 @@ of the app. Beware that this comes at a CPU cost!",
       .checked_add(std::time::Duration::from_secs(expires_in_secs))
       .unwrap_or_else(SystemTime::now)
   } else {
-    // If no token, set expiry to now so we trigger refresh
-    SystemTime::now()
+    drop(token_lock);
+    return Err(anyhow!("Authentication failed: no valid token available"));
   };
   drop(token_lock); // Release the lock
 

@@ -14,7 +14,7 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rspotify = { version = "0.12", default-features = false, features = ["cli", "env-file", "client-reqwest"] }
+rspotify = { version = "0.12", features = ["cli", "env-file"] }
 ratatui = { version = "0.26", features = ["crossterm"], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -29,6 +29,7 @@ tokio = { version = "1.40", features = ["full"] }
 rand = "0.8.4"
 anyhow = "1.0.43"
 chrono = "0.4.42"
+open = "5.0"
 
 [[bin]]
 bench = false
