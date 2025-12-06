@@ -270,6 +270,7 @@ pub struct App {
   pub saved_album_tracks_index: usize,
   pub api_error: String,
   pub current_playback_context: Option<CurrentPlaybackContext>,
+  pub last_track_id: Option<String>,
   pub devices: Option<DevicePayload>,
   // Inputs:
   // input is the string for input;
@@ -368,6 +369,7 @@ impl Default for App {
       small_search_limit: 4,
       api_error: String::new(),
       current_playback_context: None,
+      last_track_id: None,
       devices: None,
       input: vec![],
       input_idx: 0,
