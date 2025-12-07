@@ -31,8 +31,11 @@ pub struct UserTheme {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Theme {
+  #[allow(dead_code)]
   pub analysis_bar: Color,
+  #[allow(dead_code)]
   pub analysis_bar_text: Color,
+  #[allow(dead_code)]
   pub active: Color,
   pub banner: Color,
   pub error_border: Color,
