@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.31.0] - 2025-12-07
+
+### Added
+
+- **Lyrics in Basic View**: Introduced lyrics support in the basic view mode (press `B` to toggle)
+
+### Changed
+
+- **Network Layer**: Implement network layer for Spotify API interactions and I/O event handling
+- **Improved Playlist Scrolling**: Increased playlist fetch batch size to 50 for smoother scrolling performance
+
+### Fixed
+
+- **UI Lag on Skip**: Fixed issue where UI showed the old song for a few seconds after skipping by adding a small delay for state propagation
+
 ## [0.30.1] - 2025-12-07
 
 ### Fixed
