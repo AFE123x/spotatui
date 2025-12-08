@@ -85,7 +85,6 @@ Download the latest release for your platform from [GitHub Releases](https://git
 | ---------------------------------- | ------------------------------------- |
 | Windows 10/11 (64-bit)             | `spotatui-windows-x86_64.zip`         |
 | Linux (Ubuntu, Arch, Fedora, etc.) | `spotatui-linux-x86_64.tar.gz`        |
-| Linux (Alpine / musl)              | `spotatui-linux-alpine-x86_64.tar.gz` |
 | macOS (Intel)                      | `spotatui-macos-x86_64.tar.gz`        |
 | macOS (Apple Silicon M1/M2/M3)     | `spotatui-macos-aarch64.tar.gz`       |
 
