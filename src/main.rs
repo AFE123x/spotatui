@@ -595,6 +595,9 @@ async fn start_ui(user_config: UserConfig, app: &Arc<Mutex<App>>) -> Result<()> 
       ActiveBlock::UpdatePrompt => {
         ui::draw_update_prompt(f, &app);
       }
+      ActiveBlock::Settings => {
+        ui::settings::draw_settings(f, &app);
+      }
       _ => {
         ui::draw_main_layout(f, &app);
       }
