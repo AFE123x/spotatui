@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.33.2] - 2025-12-08
+
+### Fixed
+
+- **Audio Visualization Now Works on `cargo install`**: Added `audio-viz-cpal` to default features so audio visualization works out of the box when installing via `cargo install spotatui`
+  - Previously, only pre-built binaries had audio visualization enabled
+  - Uses cross-platform `cpal` library for Windows, macOS, and Linux support
+
+### Changed
+
+- Updated README with detailed audio visualization platform support table:
+  - **Windows**: Works out of the box (WASAPI loopback)
+  - **Linux**: Works out of the box (PipeWire/PulseAudio monitor)
+  - **macOS**: Requires virtual audio device (BlackHole or Loopback)
+
 ## [0.33.0] - 2025-12-08
 
 ### Added
