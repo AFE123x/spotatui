@@ -1622,6 +1622,12 @@ impl App {
             description: "Color for playbar progress".to_string(),
             value: SettingValue::Color(color_to_string(self.user_config.theme.playbar_progress)),
           },
+          SettingItem {
+            id: "theme.highlighted_lyrics".to_string(),
+            name: "Lyrics Highlight".to_string(),
+            description: "Color for current lyrics line".to_string(),
+            value: SettingValue::Color(color_to_string(self.user_config.theme.highlighted_lyrics)),
+          },
         ]
       }
     };

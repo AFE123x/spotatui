@@ -970,7 +970,7 @@ fn draw_lyrics(f: &mut Frame<'_>, app: &App, area: Rect) {
         // Some terminals (like Kitty with custom themes) remap ANSI colors
         let style = if is_active {
           Style::default()
-            .fg(Color::Rgb(255, 255, 255)) // Bright white - always visible
+            .fg(app.user_config.theme.highlighted_lyrics) // Use theme color for highlighted lyrics
             .add_modifier(Modifier::BOLD)
         } else {
           Style::default().fg(Color::Rgb(100, 100, 100)) // Dim gray for inactive lines

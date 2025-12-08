@@ -27,6 +27,7 @@ pub struct UserTheme {
   pub selected: Option<String>,
   pub text: Option<String>,
   pub header: Option<String>,
+  pub highlighted_lyrics: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -50,6 +51,7 @@ pub struct Theme {
   pub selected: Color,
   pub text: Color,
   pub header: Color,
+  pub highlighted_lyrics: Color,
 }
 
 impl Default for Theme {
@@ -74,6 +76,7 @@ impl Default for Theme {
       selected: Color::Rgb(0, 200, 200), // LightCyan equivalent
       text: Color::Reset,
       header: Color::Reset,
+      highlighted_lyrics: Color::Rgb(0, 200, 200), // LightCyan equivalent
     }
   }
 }
@@ -169,7 +172,8 @@ impl ThemePreset {
         playbar_text: Color::Rgb(248, 248, 242),
         selected: Color::Rgb(139, 233, 253), // Cyan
         text: Color::Rgb(248, 248, 242),
-        header: Color::Rgb(255, 121, 198), // Pink
+        header: Color::Rgb(255, 121, 198),             // Pink
+        highlighted_lyrics: Color::Rgb(255, 121, 198), // Pink
       },
       ThemePreset::Nord => Theme {
         analysis_bar: Color::Rgb(136, 192, 208),      // Nord8 (frost)
@@ -188,6 +192,7 @@ impl ThemePreset {
         selected: Color::Rgb(129, 161, 193), // Nord9
         text: Color::Rgb(236, 239, 244),     // Nord6
         header: Color::Rgb(136, 192, 208),
+        highlighted_lyrics: Color::Rgb(136, 192, 208), // Nord8 (frost)
       },
       ThemePreset::SolarizedDark => Theme {
         analysis_bar: Color::Rgb(38, 139, 210),       // Blue
@@ -206,6 +211,7 @@ impl ThemePreset {
         selected: Color::Rgb(42, 161, 152),      // Cyan
         text: Color::Rgb(147, 161, 161),         // Base1
         header: Color::Rgb(38, 139, 210),
+        highlighted_lyrics: Color::Rgb(38, 139, 210), // Blue
       },
       ThemePreset::Monokai => Theme {
         analysis_bar: Color::Rgb(102, 217, 239),      // Cyan
@@ -224,6 +230,7 @@ impl ThemePreset {
         selected: Color::Rgb(102, 217, 239), // Cyan
         text: Color::Rgb(248, 248, 242),
         header: Color::Rgb(249, 38, 114),
+        highlighted_lyrics: Color::Rgb(249, 38, 114), // Pink
       },
       ThemePreset::Gruvbox => Theme {
         analysis_bar: Color::Rgb(131, 165, 152),      // Aqua
@@ -239,9 +246,10 @@ impl ThemePreset {
         playbar_progress: Color::Rgb(184, 187, 38), // Green
         playbar_progress_text: Color::Rgb(235, 219, 178),
         playbar_text: Color::Rgb(235, 219, 178),
-        selected: Color::Rgb(131, 165, 152), // Aqua
-        text: Color::Rgb(235, 219, 178),     // fg
-        header: Color::Rgb(254, 128, 25),    // Orange
+        selected: Color::Rgb(131, 165, 152),          // Aqua
+        text: Color::Rgb(235, 219, 178),              // fg
+        header: Color::Rgb(254, 128, 25),             // Orange
+        highlighted_lyrics: Color::Rgb(254, 128, 25), // Orange
       },
       ThemePreset::Spotify => Theme {
         analysis_bar: Color::Rgb(29, 185, 84), // Spotify Green #1DB954
@@ -260,6 +268,7 @@ impl ThemePreset {
         selected: Color::Rgb(29, 185, 84),       // Spotify Green
         text: Color::Rgb(255, 255, 255),         // White
         header: Color::Rgb(29, 185, 84),         // Spotify Green
+        highlighted_lyrics: Color::Rgb(29, 185, 84), // Spotify Green
       },
       ThemePreset::Custom => Theme::default(), // Won't be used directly
     }
@@ -592,6 +601,7 @@ impl UserConfig {
     to_theme_item!(selected);
     to_theme_item!(text);
     to_theme_item!(header);
+    to_theme_item!(highlighted_lyrics);
     Ok(())
   }
 
@@ -724,26 +734,46 @@ impl UserConfig {
       set_window_title: Some(self.behavior.set_window_title),
     };
 
-    // If the file exists, try to read it first to preserve keybindings and theme
+    // Helper to build theme config from current values
+    let build_theme = || UserTheme {
+      active: Some(color_to_string(self.theme.active)),
+      banner: Some(color_to_string(self.theme.banner)),
+      error_border: Some(color_to_string(self.theme.error_border)),
+      error_text: Some(color_to_string(self.theme.error_text)),
+      hint: Some(color_to_string(self.theme.hint)),
+      hovered: Some(color_to_string(self.theme.hovered)),
+      inactive: Some(color_to_string(self.theme.inactive)),
+      playbar_background: Some(color_to_string(self.theme.playbar_background)),
+      playbar_progress: Some(color_to_string(self.theme.playbar_progress)),
+      playbar_progress_text: Some(color_to_string(self.theme.playbar_progress_text)),
+      playbar_text: Some(color_to_string(self.theme.playbar_text)),
+      selected: Some(color_to_string(self.theme.selected)),
+      text: Some(color_to_string(self.theme.text)),
+      header: Some(color_to_string(self.theme.header)),
+      highlighted_lyrics: Some(color_to_string(self.theme.highlighted_lyrics)),
+    };
+
+    // If the file exists, try to read it first to preserve keybindings
     let final_config = if paths.config_file_path.exists() {
       let config_string = fs::read_to_string(&paths.config_file_path)?;
       if !config_string.trim().is_empty() {
         let mut existing: UserConfigString = serde_yaml::from_str(&config_string)?;
-        // Update only behavior, keep existing keybindings and theme
+        // Update behavior and theme
         existing.behavior = Some(build_behavior());
+        existing.theme = Some(build_theme());
         existing
       } else {
         UserConfigString {
           keybindings: None,
           behavior: Some(build_behavior()),
-          theme: None,
+          theme: Some(build_theme()),
         }
       }
     } else {
       UserConfigString {
         keybindings: None,
         behavior: Some(build_behavior()),
-        theme: None,
+        theme: Some(build_theme()),
       }
     };
 
@@ -794,6 +824,30 @@ fn parse_theme_item(theme_item: &str) -> Result<Color> {
   };
 
   Ok(color)
+}
+
+fn color_to_string(color: Color) -> String {
+  match color {
+    Color::Reset => "Reset".to_string(),
+    Color::Black => "Black".to_string(),
+    Color::Red => "Red".to_string(),
+    Color::Green => "Green".to_string(),
+    Color::Yellow => "Yellow".to_string(),
+    Color::Blue => "Blue".to_string(),
+    Color::Magenta => "Magenta".to_string(),
+    Color::Cyan => "Cyan".to_string(),
+    Color::Gray => "Gray".to_string(),
+    Color::DarkGray => "DarkGray".to_string(),
+    Color::LightRed => "LightRed".to_string(),
+    Color::LightGreen => "LightGreen".to_string(),
+    Color::LightYellow => "LightYellow".to_string(),
+    Color::LightBlue => "LightBlue".to_string(),
+    Color::LightMagenta => "LightMagenta".to_string(),
+    Color::LightCyan => "LightCyan".to_string(),
+    Color::White => "White".to_string(),
+    Color::Rgb(r, g, b) => format!("{}, {}, {}", r, g, b),
+    _ => "Reset".to_string(),
+  }
 }
 
 #[cfg(test)]
