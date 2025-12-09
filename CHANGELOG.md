@@ -11,6 +11,18 @@
   - Optimized for size (`opt-level = "s"`)
   - Thanks to zamazan4ik for the suggestion in Issue #5!
 
+### Fixed
+
+- **Next Track Skip Shows Stale Progress**: Fixed bug where skipping to the next track with native streaming would show stale progress from the previous song and appear paused
+  - Root cause: `get_current_playback()` was preserving the old track's `is_playing` state (often `false` during transition), which overwrote the new track's correct state from the Spotify API
+  - Fix: Only preserve volume, shuffle, and repeat states when native streaming is active - `is_playing` now comes from the API response or player events
+  - Result: Playbar correctly shows "Playing" and reset progress when skipping tracks
+
+- **Playbar Shows Old Track After Skip**: Fixed delay where playbar would briefly show the previous song's name/artist after skipping
+  - Root cause: `native_track_info` (instant track info from native player) was unconditionally cleared when API response arrived, even if API returned stale data for the old track
+  - Fix: Only clear `native_track_info` when API track name matches the native player's track
+  - Result: Playbar immediately shows the new track's name from native player, only switching to API data when it catches up
+
 ## [0.33.7] - 2025-12-09
 
 ### Fixed

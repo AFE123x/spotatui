@@ -18,3 +18,5 @@ tags
 
 .idea
 
+# Local cargo config (platform-specific settings)
+.cargo/

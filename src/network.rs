@@ -374,10 +374,10 @@ impl Network {
           let volume = self.streaming_player.as_ref().map(|p| p.get_volume());
           Some((volume, ctx.shuffle_state, ctx.repeat_state, ctx.is_playing))
         } else {
-          // No existing context yet; seed from persisted settings + current player volume
-          let volume = self.streaming_player.as_ref().map(|p| p.get_volume());
-          let shuffle = app.user_config.behavior.shuffle_enabled;
-          Some((volume, shuffle, rspotify::model::RepeatState::Off, false))
+          // No existing context yet. DON'T override API values
+          // Let the first API response set the true state from Spotify
+          // The startup IoEvent::Shuffle call will sync our preference to Spotify
+          None
         }
       } else {
         None
@@ -430,19 +430,38 @@ impl Network {
         };
 
         // Preserve local streaming states (API returns stale server-side state)
+        // Note: We only preserve volume, shuffle, and repeat - NOT is_playing.
+        // is_playing must come from the API response or player events, otherwise
+        // skipping tracks causes the new track to appear paused (stale state from old track).
         #[cfg(feature = "streaming")]
-        if let Some((volume, shuffle, repeat, is_playing)) = local_state {
+        if let Some((volume, shuffle, repeat, _is_playing)) = local_state {
           if let Some(vol) = volume {
             c.device.volume_percent = Some(vol.into());
           }
           c.shuffle_state = shuffle;
           c.repeat_state = repeat;
-          c.is_playing = is_playing;
         }
 
         app.current_playback_context = Some(c);
-        // Clear native track info since we now have full API data
-        app.native_track_info = None;
+        // Only clear native track info if API data matches the native player's track
+        // This prevents stale API responses (returning old track) from clearing
+        // the correct native track info we got from TrackChanged event
+        if let Some(ref native_info) = app.native_track_info {
+          if let Some(ref ctx) = app.current_playback_context {
+            if let Some(ref item) = ctx.item {
+              let api_track_name = match item {
+                PlayableItem::Track(t) => &t.name,
+                PlayableItem::Episode(e) => &e.name,
+              };
+              // Only clear if names match (API caught up to native player)
+              if api_track_name == &native_info.name {
+                app.native_track_info = None;
+              }
+            }
+          }
+        } else {
+          app.native_track_info = None;
+        }
       }
       Ok(None) => {
         app.instant_since_last_current_playback_poll = Instant::now();
