@@ -17,6 +17,17 @@ A Spotify client for the terminal written in Rust.
 
 ![Demo](.github/demo.gif)
 
+### ⚡ Performance
+
+spotatui is extremely lightweight compared to the official Electron client.
+
+| Mode | RAM Usage |
+| :--- | :--- |
+| **Native Streaming (Base)** | ~48 MB |
+| **With Synced Lyrics** | ~48 MB |
+| **With System-Wide Visualizer** | ~56 MB |
+
+*Tested on Arch Linux (Hyprland).*
 
 ## Privacy Notice
 
@@ -32,6 +43,7 @@ We respect your privacy. This is purely a fun community metric with zero trackin
 ---
 
 - [spotatui](#spotatui)
+  - [Performance](#-performance)
   - [Privacy Notice](#privacy-notice)
   - [Migrating from spotify-tui](#migrating-from-spotify-tui)
   - [Installation](#installation)
