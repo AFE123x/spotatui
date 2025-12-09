@@ -1,0 +1,69 @@
+name: Publish to AUR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (e.g., 0.33.6)"
+        required: false
+        type: string
+
+jobs:
+  publish-aur:
+    name: Publish to AUR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          TARBALL_URL="https://github.com/${{ github.repository }}/archive/refs/tags/v${{ steps.version.outputs.version }}.tar.gz"
+          SHA256=$(curl -sL "$TARBALL_URL" | sha256sum | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "SHA256: $SHA256"
+
+      - name: Setup SSH for AUR
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          git config --global user.name "${{ secrets.AUR_USERNAME }}"
+          git config --global user.email "${{ secrets.AUR_EMAIL }}"
+
+      - name: Clone AUR repository
+        run: |
+          GIT_SSH_COMMAND='ssh -i ~/.ssh/aur -o IdentitiesOnly=yes' git clone ssh://aur@aur.archlinux.org/spotatui.git aur
+
+      - name: Update PKGBUILD
+        working-directory: aur
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${{ steps.sha256.outputs.sha256 }}')/" PKGBUILD
+
+      - name: Generate .SRCINFO
+        working-directory: aur
+        run: |
+          # Install makepkg dependencies
+          docker run --rm -v $PWD:/pkg archlinux:latest /bin/bash -c "pacman -Syu --noconfirm --needed base-devel && cd /pkg && makepkg --printsrcinfo > .SRCINFO"
+
+      - name: Commit and push to AUR
+        working-directory: aur
+        run: |
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to ${{ steps.version.outputs.version }}"
+          GIT_SSH_COMMAND='ssh -i ~/.ssh/aur -o IdentitiesOnly=yes' git push
