@@ -182,6 +182,8 @@ But here they are again:
 1. You will be redirected to an official Spotify webpage to ask you for permissions.
 1. After accepting the permissions, you'll be redirected to localhost. If all goes well, the redirect URL will be parsed automatically and now you're done. If the local webserver fails for some reason you'll be redirected to a blank webpage that might say something like "Connection Refused" since no server is running. Regardless, copy the URL and paste into the prompt in the terminal.
 
+> **💡 Tip:** If the authentication doesn't work after pasting the URL, try changing `127.0.0.1` to `localhost` in the copied URL before pasting it into the terminal. Some systems may have issues with one format or the other.
+
 And now you are ready to use `spotatui` 🎉
 
 You can edit the config at anytime at `${HOME}/.config/spotatui/client.yml`.
