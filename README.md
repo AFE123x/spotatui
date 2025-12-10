@@ -21,11 +21,11 @@ A Spotify client for the terminal written in Rust.
 
 spotatui is extremely lightweight compared to the official Electron client.
 
-| Mode | RAM Usage |
-| :--- | :--- |
-| **Native Streaming (Base)** | ~48 MB |
-| **With Synced Lyrics** | ~48 MB |
-| **With System-Wide Visualizer** | ~56 MB |
+| Mode                            | RAM Usage |
+| :------------------------------ | :-------- |
+| **Native Streaming (Base)**     | ~48 MB    |
+| **With Synced Lyrics**          | ~48 MB    |
+| **With System-Wide Visualizer** | ~56 MB    |
 
 *Tested on Arch Linux (Hyprland).*
 
@@ -43,7 +43,7 @@ We respect your privacy. This is purely a fun community metric with zero trackin
 ---
 
 - [spotatui](#spotatui)
-  - [Performance](#-performance)
+    - [⚡ Performance](#-performance)
   - [Privacy Notice](#privacy-notice)
   - [Migrating from spotify-tui](#migrating-from-spotify-tui)
   - [Installation](#installation)
@@ -154,13 +154,41 @@ cargo install spotatui
 
 Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed.
 
+**macOS Prerequisites:**
+
+```bash
+brew install portaudio
+```
+
+**Linux Prerequisites:**
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libssl-dev libasound2-dev pkg-config
+
+# Arch Linux
+sudo pacman -S openssl alsa-lib pkg-config
+
+# Fedora
+sudo dnf install openssl-devel alsa-lib-devel pkg-config
+```
+
+**Building:**
+
 1.  Clone the repository:
     ```bash
     git clone https://github.com/LargeModGames/spotatui.git
     cd spotatui
     ```
 
-2.  Install using Cargo:
+2.  Build and install:
+
+    **macOS:**
+    ```bash
+    cargo install --path . --no-default-features --features telemetry,streaming,portaudio-backend,audio-viz-cpal
+    ```
+
+    **Linux/Windows:**
     ```bash
     cargo install --path .
     ```
@@ -182,7 +210,6 @@ When a new version of spotatui is available, you'll see a popup notification on 
 
 This will download and install the latest version automatically.
 
-> **Note for AUR users:** While you can update through your AUR helper (e.g., `yay -S spotatui`), it's not recommended as it will rebuild everything from source, which takes significantly longer than using `spotatui update --install`.
 
 ## Connecting to Spotify's API
 

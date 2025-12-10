@@ -58,7 +58,7 @@ librespot-playback = { version = "0.8", optional = true, default-features = fals
 librespot-playback = { version = "0.8", optional = true, default-features = false, features = ["rodio-backend"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
-librespot-playback = { version = "0.8", optional = true, default-features = false, features = ["rodio-backend"] }
+librespot-playback = { version = "0.8", optional = true, default-features = false }
 
 # MPRIS D-Bus support (Linux only)
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -68,6 +68,15 @@ mpris-server = { version = "0.8", optional = true }
 default = ["telemetry", "streaming", "audio-viz-cpal", "mpris"]
 telemetry = ["reqwest", "reqwest/native-tls"]
 streaming = ["librespot-core", "librespot-playback", "librespot-connect", "librespot-oauth", "librespot-metadata"]
+# Audio backend features
+alsa-backend = ["streaming", "librespot-playback/alsa-backend"]
+pulseaudio-backend = ["streaming", "librespot-playback/pulseaudio-backend"]
+rodio-backend = ["streaming", "librespot-playback/rodio-backend"]
+portaudio-backend = ["streaming", "librespot-playback/portaudio-backend"]
+jackaudio-backend = ["streaming", "librespot-playback/jackaudio-backend"]
+rodiojack-backend = ["streaming", "librespot-playback/rodiojack-backend"]
+sdl-backend = ["streaming", "librespot-playback/sdl-backend"]
+gstreamer-backend = ["streaming", "librespot-playback/gstreamer-backend"]
 audio-viz = ["realfft", "pipewire"]
 audio-viz-cpal = ["realfft", "cpal"]  # Alternative for Windows/macOS or if pipewire issues
 mpris = ["mpris-server", "streaming"]  # MPRIS D-Bus integration (Linux only, requires streaming)
