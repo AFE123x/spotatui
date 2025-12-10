@@ -1276,6 +1276,14 @@ impl Network {
       }
     }
 
+    // Store the current track ID before skipping
+    let old_track_id = {
+      let mut app = self.app.lock().await;
+      // Reset progress immediately for instant UI feedback
+      app.song_progress_ms = 0;
+      app.last_track_id.clone()
+    };
+
     // Fallback to API-based skip
     match self
       .spotify
@@ -1283,8 +1291,21 @@ impl Network {
       .await
     {
       Ok(()) => {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        self.get_current_playback().await;
+        // Retry mechanism: Poll multiple times until we get updated metadata
+        // Spotify's API can be slow to update after a skip command
+        for attempt in 0..5 {
+          let delay = if attempt == 0 { 100 } else { 200 * attempt }; // 100ms, 200ms, 400ms, 600ms, 800ms
+          tokio::time::sleep(Duration::from_millis(delay as u64)).await;
+          self.get_current_playback().await;
+
+          // Check if we got the new track - if so, stop retrying
+          let app = self.app.lock().await;
+          let current_track_id = app.last_track_id.clone();
+          if current_track_id != old_track_id {
+            // Successfully got new track metadata
+            break;
+          }
+        }
       }
       Err(e) => {
         self.handle_error(anyhow!(e)).await;
@@ -1306,6 +1327,14 @@ impl Network {
       }
     }
 
+    // Store the current track ID before skipping
+    let old_track_id = {
+      let mut app = self.app.lock().await;
+      // Reset progress immediately for instant UI feedback
+      app.song_progress_ms = 0;
+      app.last_track_id.clone()
+    };
+
     // Fallback to API-based skip
     match self
       .spotify
@@ -1313,8 +1342,21 @@ impl Network {
       .await
     {
       Ok(()) => {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        self.get_current_playback().await;
+        // Retry mechanism: Poll multiple times until we get updated metadata
+        // Spotify's API can be slow to update after a skip command
+        for attempt in 0..5 {
+          let delay = if attempt == 0 { 100 } else { 200 * attempt }; // 100ms, 200ms, 400ms, 600ms, 800ms
+          tokio::time::sleep(Duration::from_millis(delay as u64)).await;
+          self.get_current_playback().await;
+
+          // Check if we got the new track - if so, stop retrying
+          let app = self.app.lock().await;
+          let current_track_id = app.last_track_id.clone();
+          if current_track_id != old_track_id {
+            // Successfully got new track metadata
+            break;
+          }
+        }
       }
       Err(e) => {
         self.handle_error(anyhow!(e)).await;
