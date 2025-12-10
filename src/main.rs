@@ -6,6 +6,8 @@ mod cli;
 mod config;
 mod event;
 mod handlers;
+#[cfg(feature = "mpris")]
+mod mpris;
 mod network;
 #[cfg(feature = "streaming")]
 mod player;

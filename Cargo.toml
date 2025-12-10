@@ -60,12 +60,17 @@ librespot-playback = { version = "0.8", optional = true, default-features = fals
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 librespot-playback = { version = "0.8", optional = true, default-features = false, features = ["rodio-backend"] }
 
+# MPRIS D-Bus support (Linux only)
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris-server = { version = "0.8", optional = true }
+
 [features]
-default = ["telemetry", "streaming", "audio-viz-cpal"]
+default = ["telemetry", "streaming", "audio-viz-cpal", "mpris"]
 telemetry = ["reqwest", "reqwest/native-tls"]
 streaming = ["librespot-core", "librespot-playback", "librespot-connect", "librespot-oauth", "librespot-metadata"]
 audio-viz = ["realfft", "pipewire"]
 audio-viz-cpal = ["realfft", "cpal"]  # Alternative for Windows/macOS or if pipewire issues
+mpris = ["mpris-server", "streaming"]  # MPRIS D-Bus integration (Linux only, requires streaming)
 
 [target.'cfg(target_env = "musl")'.dependencies]
 openssl-sys = { version = "0.9", features = ["vendored"] }
