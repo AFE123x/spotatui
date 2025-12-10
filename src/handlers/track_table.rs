@@ -62,6 +62,19 @@ pub fn handler(key: Key, app: &mut App) {
               }
             }
           }
+          Some(TrackTableContext::SavedTracks) => {
+            // Check if there are more saved tracks to load
+            if let Some(saved_tracks) = app.library.saved_tracks.get_results(None) {
+              let current_offset = saved_tracks.offset;
+              let limit = saved_tracks.limit;
+              // If there are more tracks beyond current page
+              if current_offset + limit < saved_tracks.total {
+                app.get_current_user_saved_tracks_next();
+                app.track_table.selected_index = 0;
+                return;
+              }
+            }
+          }
           _ => {}
         }
       }
@@ -114,6 +127,15 @@ pub fn handler(key: Key, app: &mut App) {
                 app.track_table.selected_index = app.large_search_limit.saturating_sub(1) as usize;
                 return;
               }
+            }
+          }
+          Some(TrackTableContext::SavedTracks) => {
+            // Check if there are previous saved tracks to load
+            if app.library.saved_tracks.index > 0 {
+              app.get_current_user_saved_tracks_previous();
+              // Set selection to last track of the loaded page
+              app.track_table.selected_index = app.large_search_limit.saturating_sub(1) as usize;
+              return;
             }
           }
           _ => {}
@@ -450,21 +472,40 @@ fn on_enter(app: &mut App) {
         }
       }
       TrackTableContext::SavedTracks => {
-        if let Some(saved_tracks) = &app.library.saved_tracks.get_results(None) {
-          let playable_ids: Vec<PlayableId<'static>> = saved_tracks
-            .items
-            .iter()
-            .filter_map(|item| track_playable_id(item.track.id.clone()))
-            .collect();
+        // Collect tracks from ALL loaded pages (not just current page)
+        // This gives us a larger playback range as the user browses
+        let mut all_playable_ids: Vec<PlayableId<'static>> = Vec::new();
+        let current_page_index = app.library.saved_tracks.index;
 
-          if !playable_ids.is_empty() {
-            app.dispatch(IoEvent::StartPlayback(
-              None,
-              Some(playable_ids),
-              Some(app.track_table.selected_index),
-            ));
+        // Iterate through all loaded pages
+        for (page_idx, page) in app.library.saved_tracks.pages.iter().enumerate() {
+          for item in &page.items {
+            if let Some(id) = track_playable_id(item.track.id.clone()) {
+              all_playable_ids.push(id);
+            }
           }
-        };
+          // If this is the current page, calculate the absolute offset for the selected track
+          if page_idx == current_page_index {
+            // This is handled below by calculating from page sizes
+          }
+        }
+
+        if !all_playable_ids.is_empty() {
+          // Calculate absolute offset: (sum of previous page sizes) + selected index in current page
+          let mut absolute_offset = 0;
+          for page_idx in 0..current_page_index {
+            if let Some(page) = app.library.saved_tracks.pages.get(page_idx) {
+              absolute_offset += page.items.len();
+            }
+          }
+          absolute_offset += app.track_table.selected_index;
+
+          app.dispatch(IoEvent::StartPlayback(
+            None,
+            Some(all_playable_ids),
+            Some(absolute_offset),
+          ));
+        }
       }
       TrackTableContext::AlbumSearch => {}
       TrackTableContext::PlaylistSearch => {

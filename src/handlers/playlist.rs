@@ -52,7 +52,12 @@ pub fn handler(key: Key, app: &mut App) {
         app.playlist_offset = 0;
         if let Some(selected_playlist) = playlists.items.get(selected_playlist_index.to_owned()) {
           let playlist_id = selected_playlist.id.clone().into_static();
-          app.dispatch(IoEvent::GetPlaylistItems(playlist_id, app.playlist_offset));
+          app.dispatch(IoEvent::GetPlaylistItems(
+            playlist_id.clone(),
+            app.playlist_offset,
+          ));
+          // Pre-fetch more pages in background for seamless playback
+          app.dispatch(IoEvent::PreFetchAllPlaylistTracks(playlist_id));
         }
       };
     }
