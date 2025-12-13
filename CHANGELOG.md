@@ -1,6 +1,11 @@
 # Changelog
 
-## [0.34.1] - TBD
+## [0.34.2] - 2025-13-12
+
+### Added
+
+- **Persistent Playback Device**: Saves the last used playback device (for example, `spotatui` or `spotifyd`) and re-selects it automatically on the next startup so playback resumes on the same device.
+
 
 ### Fixed
 
