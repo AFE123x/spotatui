@@ -618,8 +618,14 @@ impl App {
   }
 
   fn poll_current_playback(&mut self) {
-    // Poll every 5 seconds
-    let poll_interval_ms = 5_000;
+    // Poll interval depends on playback mode:
+    // - Native streaming: 5 seconds (real-time events provide updates between polls)
+    // - External players (spotifyd, etc.): 1 second (no events, need faster polling for smooth playbar)
+    let poll_interval_ms = if self.is_streaming_active {
+      5_000
+    } else {
+      1_000
+    };
 
     let elapsed = self
       .instant_since_last_current_playback_poll
