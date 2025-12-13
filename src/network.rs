@@ -1401,70 +1401,40 @@ impl Network {
       }
     }
 
-    // Store the current track ID before skipping
-    let (old_track_id, was_playing) = {
+    // Store if playing before skip for auto-resume
+    let was_playing = {
       let mut app = self.app.lock().await;
       // Reset progress immediately for instant UI feedback
       app.song_progress_ms = 0;
-      (
-        app.last_track_id.clone(),
-        app
-          .current_playback_context
-          .as_ref()
-          .map(|c| c.is_playing)
-          .unwrap_or(false),
-      )
+      app
+        .current_playback_context
+        .as_ref()
+        .map(|c| c.is_playing)
+        .unwrap_or(false)
     };
 
-    // Fallback to API-based skip
+    // API-based skip for external players (spotifyd, etc.)
     match self
       .spotify
       .next_track(self.client_config.device_id.as_deref())
       .await
     {
       Ok(()) => {
-        // Retry mechanism: Poll multiple times until we get updated metadata
-        // Spotify's API can be slow to update after a skip command
-        for attempt in 0..5 {
-          let delay = if attempt == 0 { 100 } else { 200 * attempt }; // 100ms, 200ms, 400ms, 600ms, 800ms
-          tokio::time::sleep(Duration::from_millis(delay as u64)).await;
-          self.get_current_playback().await;
+        // Small delay to let the external player process the skip
+        tokio::time::sleep(Duration::from_millis(200)).await;
 
-          // Check if we got the new track - if so, stop retrying
-          let app = self.app.lock().await;
-          let current_track_id = app.last_track_id.clone();
-          if current_track_id != old_track_id {
-            // Successfully got new track metadata
-            break;
-          }
-        }
-
-        // If we were playing before the skip but the next track lands paused, resume.
+        // For external players, proactively resume if we were playing
+        // Spotifyd often lands in paused state after skip
         if was_playing {
-          let should_resume = {
-            let app = self.app.lock().await;
-            let track_changed = app.last_track_id != old_track_id;
-            let is_paused = app
-              .current_playback_context
-              .as_ref()
-              .map(|c| !c.is_playing)
-              .unwrap_or(false);
-            track_changed && is_paused
-          };
-
-          if should_resume {
-            if let Err(e) = self
-              .spotify
-              .resume_playback(self.client_config.device_id.as_deref(), None)
-              .await
-            {
-              self.handle_error(anyhow!(e)).await;
-            } else {
-              tokio::time::sleep(Duration::from_millis(250)).await;
-              self.get_current_playback().await;
-            }
-          }
+          let _ = self
+            .spotify
+            .resume_playback(self.client_config.device_id.as_deref(), None)
+            .await;
         }
+
+        // Small delay then fetch updated state
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        self.get_current_playback().await;
       }
       Err(e) => {
         self.handle_error(anyhow!(e)).await;
@@ -1495,70 +1465,40 @@ impl Network {
       }
     }
 
-    // Store the current track ID before skipping
-    let (old_track_id, was_playing) = {
+    // Store if playing before skip for auto-resume
+    let was_playing = {
       let mut app = self.app.lock().await;
       // Reset progress immediately for instant UI feedback
       app.song_progress_ms = 0;
-      (
-        app.last_track_id.clone(),
-        app
-          .current_playback_context
-          .as_ref()
-          .map(|c| c.is_playing)
-          .unwrap_or(false),
-      )
+      app
+        .current_playback_context
+        .as_ref()
+        .map(|c| c.is_playing)
+        .unwrap_or(false)
     };
 
-    // Fallback to API-based skip
+    // API-based skip for external players (spotifyd, etc.)
     match self
       .spotify
       .previous_track(self.client_config.device_id.as_deref())
       .await
     {
       Ok(()) => {
-        // Retry mechanism: Poll multiple times until we get updated metadata
-        // Spotify's API can be slow to update after a skip command
-        for attempt in 0..5 {
-          let delay = if attempt == 0 { 100 } else { 200 * attempt }; // 100ms, 200ms, 400ms, 600ms, 800ms
-          tokio::time::sleep(Duration::from_millis(delay as u64)).await;
-          self.get_current_playback().await;
+        // Small delay to let the external player process the skip
+        tokio::time::sleep(Duration::from_millis(200)).await;
 
-          // Check if we got the new track - if so, stop retrying
-          let app = self.app.lock().await;
-          let current_track_id = app.last_track_id.clone();
-          if current_track_id != old_track_id {
-            // Successfully got new track metadata
-            break;
-          }
-        }
-
-        // If we were playing before the skip but the next track lands paused, resume.
+        // For external players, proactively resume if we were playing
+        // Spotifyd often lands in paused state after skip
         if was_playing {
-          let should_resume = {
-            let app = self.app.lock().await;
-            let track_changed = app.last_track_id != old_track_id;
-            let is_paused = app
-              .current_playback_context
-              .as_ref()
-              .map(|c| !c.is_playing)
-              .unwrap_or(false);
-            track_changed && is_paused
-          };
-
-          if should_resume {
-            if let Err(e) = self
-              .spotify
-              .resume_playback(self.client_config.device_id.as_deref(), None)
-              .await
-            {
-              self.handle_error(anyhow!(e)).await;
-            } else {
-              tokio::time::sleep(Duration::from_millis(250)).await;
-              self.get_current_playback().await;
-            }
-          }
+          let _ = self
+            .spotify
+            .resume_playback(self.client_config.device_id.as_deref(), None)
+            .await;
         }
+
+        // Small delay then fetch updated state
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        self.get_current_playback().await;
       }
       Err(e) => {
         self.handle_error(anyhow!(e)).await;
