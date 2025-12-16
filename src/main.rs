@@ -1498,6 +1498,38 @@ async fn start_ui(
             app.song_progress_ms = pos_ms;
           }
         }
+
+        // Lazy audio capture: only capture when in Analysis view
+        #[cfg(any(feature = "audio-viz", feature = "audio-viz-cpal"))]
+        {
+          let in_analysis_view = app.get_current_route().active_block == ActiveBlock::Analysis;
+
+          if in_analysis_view {
+            // Start capture if not already running
+            if audio_capture.is_none() {
+              audio_capture = audio::AudioCaptureManager::new();
+              app.audio_capture_active = audio_capture.is_some();
+            }
+
+            // Update spectrum data
+            if let Some(ref capture) = audio_capture {
+              if let Some(spectrum) = capture.get_spectrum() {
+                app.spectrum_data = Some(app::SpectrumData {
+                  bands: spectrum.bands,
+                  peak: spectrum.peak,
+                });
+                app.audio_capture_active = capture.is_active();
+              }
+            }
+          } else {
+            // Stop capture when leaving Analysis view
+            if audio_capture.is_some() {
+              audio_capture = None;
+              app.audio_capture_active = false;
+              app.spectrum_data = None;
+            }
+          }
+        }
       }
     }
 

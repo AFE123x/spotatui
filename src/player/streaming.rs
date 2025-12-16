@@ -3,12 +3,13 @@
 //! Handles authentication, session management, and audio playback with Spotify Connect.
 
 use anyhow::{anyhow, Context, Result};
-use librespot_connect::{ConnectConfig, Spirc};
+use librespot_connect::{ConnectConfig, LoadRequest, Spirc};
 use librespot_core::{
   authentication::Credentials,
   cache::Cache,
   config::{DeviceType, SessionConfig},
   session::Session,
+  spclient::TransferRequest,
   SpotifyUri,
 };
 use librespot_oauth::OAuthClientBuilder;
@@ -263,6 +264,17 @@ impl StreamingPlayer {
     Ok(())
   }
 
+  /// Load a new playback context/tracks via Spotify Connect (Spirc).
+  ///
+  /// Prefer this over `player.load()` when you want Connect state (queue, context)
+  /// to stay consistent.
+  pub fn load(&self, request: LoadRequest) -> Result<()> {
+    self
+      .spirc
+      .load(request)
+      .map_err(|e| anyhow!("Failed to load playback via Spirc: {:?}", e))
+  }
+
   /// Play a track by its Spotify ID (will be converted to URI)
   pub async fn play_track(&self, track_id: &str) -> Result<()> {
     let uri = format!("spotify:track:{}", track_id);
@@ -334,6 +346,17 @@ impl StreamingPlayer {
   /// Activate the device (make it the active playback device)
   pub fn activate(&self) {
     let _ = self.spirc.activate();
+  }
+
+  /// Transfer playback to this device via Spotify Connect.
+  ///
+  /// This is the most reliable way to become the active device; `activate()`
+  /// can be a no-op when we're not currently active.
+  pub fn transfer(&self, request: Option<TransferRequest>) -> Result<()> {
+    self
+      .spirc
+      .transfer(request)
+      .map_err(|e| anyhow!("Failed to transfer playback via Spirc: {:?}", e))
   }
 
   /// Shutdown the player

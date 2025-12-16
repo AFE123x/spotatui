@@ -123,6 +123,10 @@ impl ClientConfig {
       self.client_secret = config_yml.client_secret;
       self.device_id = config_yml.device_id;
       self.port = config_yml.port;
+      self.enable_streaming = config_yml.enable_streaming;
+      self.streaming_device_name = config_yml.streaming_device_name;
+      self.streaming_bitrate = config_yml.streaming_bitrate;
+      self.streaming_audio_cache = config_yml.streaming_audio_cache;
 
       Ok(())
     } else {

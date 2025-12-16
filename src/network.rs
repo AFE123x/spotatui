@@ -34,6 +34,8 @@ use tokio::try_join;
 
 #[cfg(feature = "streaming")]
 use crate::player::StreamingPlayer;
+#[cfg(feature = "streaming")]
+use librespot_connect::{LoadRequest, LoadRequestOptions, PlayingTrack};
 
 pub enum IoEvent {
   GetCurrentPlayback,
