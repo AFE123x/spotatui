@@ -178,38 +178,29 @@ impl Network {
       return false;
     }
 
-    // If user has explicitly selected a device (saved device_id), check if it matches native
-    // If device_id is set, it means user made an explicit choice - respect that
-    if let Some(ref device_id) = self.client_config.device_id {
-      // Get native player's device name from streaming player
-      if let Some(ref player) = self.streaming_player {
-        // Native streaming device name is set - if saved device_id doesn't look like it's from native,
-        // use API path. Unfortunately we don't have the device_id of native player easily,
-        // so we rely on context checking below.
-        let _ = (device_id, player); // Silence unused warnings
-      }
-    }
-
     // Get the native streaming device name
     let native_device_name = self
       .streaming_player
       .as_ref()
       .map(|p| p.device_name().to_lowercase());
 
-    // Check if the current playback device matches the native streaming device
-    let app = self.app.lock().await;
-    if let Some(ref ctx) = app.current_playback_context {
-      if let Some(ref native_name) = native_device_name {
-        // Compare device names (case-insensitive partial match for flexibility)
-        let current_device_name = ctx.device.name.to_lowercase();
-        return current_device_name.contains(native_name)
-          || native_name.contains(&current_device_name);
+    // First, check if the current playback device matches the native streaming device
+    {
+      let app = self.app.lock().await;
+      if let Some(ref ctx) = app.current_playback_context {
+        if let Some(ref native_name) = native_device_name {
+          // Compare device names (case-insensitive partial match for flexibility)
+          let current_device_name = ctx.device.name.to_lowercase();
+          return current_device_name.contains(native_name)
+            || native_name.contains(&current_device_name);
+        }
       }
     }
 
-    // If no context yet, use API path - safer until we know which device is active
-    // This ensures spotifyd works on first button press after startup
-    false
+    // If no context yet (e.g., at startup), fall back to the app state flag which is
+    // set when the native streaming device is activated/selected.
+    let app = self.app.lock().await;
+    app.is_streaming_active
   }
 
   /// Quick check if native streaming is connected (doesn't verify active device)
@@ -463,12 +454,17 @@ impl Network {
     // that doesn't reflect recent local changes (volume, shuffle, repeat, play/pause).
     // We need to preserve these local states and restore them after getting the API response.
     #[cfg(feature = "streaming")]
-    let local_state: Option<(Option<u8>, bool, rspotify::model::RepeatState, bool)> =
+    let local_state: Option<(Option<u8>, bool, rspotify::model::RepeatState, Option<bool>)> =
       if self.is_native_streaming_active() {
         let app = self.app.lock().await;
         if let Some(ref ctx) = app.current_playback_context {
           let volume = self.streaming_player.as_ref().map(|p| p.get_volume());
-          Some((volume, ctx.shuffle_state, ctx.repeat_state, ctx.is_playing))
+          Some((
+            volume,
+            ctx.shuffle_state,
+            ctx.repeat_state,
+            app.native_is_playing,
+          ))
         } else {
           // No existing context yet. DON'T override API values
           // Let the first API response set the true state from Spotify
@@ -492,6 +488,16 @@ impl Network {
     match context {
       Ok(Some(mut c)) => {
         app.instant_since_last_current_playback_poll = Instant::now();
+
+        // Detect whether the native spotatui streaming device is the active Spotify device.
+        // This prevents native-only state overrides (volume, play/pause, etc.) from leaking
+        // into external devices like the Spotify desktop/mobile app.
+        #[cfg(feature = "streaming")]
+        let is_native_device = self.streaming_player.as_ref().is_some_and(|p| {
+          let native_name = p.device_name().to_lowercase();
+          let current_device_name = c.device.name.to_lowercase();
+          current_device_name.contains(&native_name) || native_name.contains(&current_device_name)
+        });
 
         // Process track info before storing context (avoids cloning)
         if let Some(ref item) = c.item {
@@ -526,39 +532,30 @@ impl Network {
         };
 
         // Preserve local streaming states (API returns stale server-side state)
-        // Note: We only preserve volume, shuffle, and repeat - NOT is_playing.
-        // is_playing must come from the API response or player events, otherwise
-        // skipping tracks causes the new track to appear paused (stale state from old track).
         #[cfg(feature = "streaming")]
-        if let Some((volume, shuffle, repeat, _is_playing)) = local_state {
-          if let Some(vol) = volume {
-            c.device.volume_percent = Some(vol.into());
+        if is_native_device {
+          if let Some((volume, shuffle, repeat, native_is_playing)) = local_state {
+            if let Some(vol) = volume {
+              c.device.volume_percent = Some(vol.into());
+            }
+            c.shuffle_state = shuffle;
+            c.repeat_state = repeat;
+            // Preserve play/pause state from native player events when available.
+            if let Some(is_playing) = native_is_playing {
+              c.is_playing = is_playing;
+            }
           }
-          c.shuffle_state = shuffle;
-          c.repeat_state = repeat;
         }
 
         // On first load with native streaming AND native device is active,
         // override API shuffle with saved preference.
         // Skip this if using external device like spotifyd
         #[cfg(feature = "streaming")]
-        if local_state.is_none() {
-          // Check if the device we just got from API matches native streaming
-          let native_device_name = self
-            .streaming_player
-            .as_ref()
-            .map(|p| p.device_name().to_lowercase());
-          let current_device_name = c.device.name.to_lowercase();
-          let is_native_device = native_device_name
-            .as_ref()
-            .is_some_and(|n| current_device_name.contains(n) || n.contains(&current_device_name));
-
-          if is_native_device {
-            c.shuffle_state = app.user_config.behavior.shuffle_enabled;
-            // Proactively set native shuffle on first load to keep backend in sync
-            if let Some(ref player) = self.streaming_player {
-              let _ = player.set_shuffle(app.user_config.behavior.shuffle_enabled);
-            }
+        if local_state.is_none() && is_native_device {
+          c.shuffle_state = app.user_config.behavior.shuffle_enabled;
+          // Proactively set native shuffle on first load to keep backend in sync
+          if let Some(ref player) = self.streaming_player {
+            let _ = player.set_shuffle(app.user_config.behavior.shuffle_enabled);
           }
         }
 
@@ -568,18 +565,7 @@ impl Network {
         // This ensures correct polling interval (1s for external devices, 5s for native)
         #[cfg(feature = "streaming")]
         {
-          let native_device_name = self
-            .streaming_player
-            .as_ref()
-            .map(|p| p.device_name().to_lowercase());
-          if let Some(ref ctx) = app.current_playback_context {
-            if let Some(ref native_name) = native_device_name {
-              let current_device_name = ctx.device.name.to_lowercase();
-              let is_native_device = current_device_name.contains(native_name)
-                || native_name.contains(&current_device_name);
-              app.is_streaming_active = is_native_device;
-            }
-          }
+          app.is_streaming_active = is_native_device;
         }
 
         // Only clear native track info if API data matches the native player's track
@@ -1016,15 +1002,115 @@ impl Network {
     uris: Option<Vec<PlayableId<'_>>>,
     offset: Option<usize>,
   ) {
-    let device_id = self.client_config.device_id.as_deref();
+    // Check if we should use native streaming for playback
+    #[cfg(feature = "streaming")]
+    if self.is_native_streaming_active_for_playback().await {
+      if let Some(ref player) = self.streaming_player {
+        // Ensure the native player is actually the active Spotify Connect device.
+        // `activate()` can be a no-op when we're not active, so prefer `transfer()`.
+        let _ = player.transfer(None);
+        // Give Connect a moment to apply the transfer before we load/play.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        player.activate();
+
+        // For resume playback (no context, no uris)
+        if context_id.is_none() && uris.is_none() {
+          player.play();
+          // Update UI state immediately
+          let mut app = self.app.lock().await;
+          if let Some(ctx) = &mut app.current_playback_context {
+            ctx.is_playing = true;
+          }
+          return;
+        }
+
+        // For URI-based or context playback, use Spirc load directly.
+        // The Web API may return 404 for native streaming devices (different OAuth session).
+        let mut options = LoadRequestOptions {
+          start_playing: true,
+          seek_to: 0,
+          context_options: None,
+          playing_track: None,
+        };
+
+        let request = match (context_id, uris) {
+          (Some(context), Some(_track_uris)) => {
+            if let Some(i) = offset.and_then(|i| u32::try_from(i).ok()) {
+              options.playing_track = Some(PlayingTrack::Index(i));
+            }
+            LoadRequest::from_context_uri(context.uri(), options)
+          }
+          (Some(context), None) => {
+            if let Some(i) = offset.and_then(|i| u32::try_from(i).ok()) {
+              options.playing_track = Some(PlayingTrack::Index(i));
+            }
+            LoadRequest::from_context_uri(context.uri(), options)
+          }
+          (None, Some(track_uris)) => {
+            if let Some(i) = offset.and_then(|i| u32::try_from(i).ok()) {
+              options.playing_track = Some(PlayingTrack::Index(i));
+            }
+            let uris = track_uris.into_iter().map(|u| u.uri()).collect::<Vec<_>>();
+            LoadRequest::from_tracks(uris, options)
+          }
+          (None, None) => {
+            // Handled above as resume playback.
+            player.play();
+            let mut app = self.app.lock().await;
+            if let Some(ctx) = &mut app.current_playback_context {
+              ctx.is_playing = true;
+            }
+            return;
+          }
+        };
+
+        match player.load(request) {
+          Ok(()) => {
+            // Best-effort: ensure we end up playing (some Connect flows load paused).
+            player.play();
+
+            // Update UI state immediately (TrackChanged/Playing events will refine state).
+            let mut app = self.app.lock().await;
+            app.song_progress_ms = 0;
+            app.native_is_playing = Some(true);
+            if let Some(ctx) = &mut app.current_playback_context {
+              ctx.is_playing = true;
+            }
+          }
+          Err(e) => {
+            self.handle_error(e).await;
+          }
+        }
+
+        return;
+      }
+    }
+
+    // If Spotify reports a current playback context, target the active device by omitting
+    // `device_id` (more robust when the user switches devices outside spotatui).
+    // When there's no active playback context, fall back to the last saved device_id.
+    let has_playback_context = {
+      let app = self.app.lock().await;
+      app.current_playback_context.is_some()
+    };
+    let device_id = if has_playback_context {
+      None
+    } else {
+      self.client_config.device_id.as_deref()
+    };
 
     // If we're playing a specific track (with offset), temporarily disable shuffle
     // to ensure the selected track plays first
     let should_disable_shuffle = offset.is_some() && uris.is_some();
     let mut original_shuffle_state = false;
 
-    if should_disable_shuffle {
-      // Get current shuffle state
+    #[cfg(feature = "streaming")]
+    let is_native = self.is_native_streaming_active_for_playback().await;
+    #[cfg(not(feature = "streaming"))]
+    let is_native = false;
+
+    if should_disable_shuffle && !is_native {
+      // Get current shuffle state (skip for native - API might fail)
       if let Ok(Some(playback)) = self.spotify.current_playback(None, None::<Vec<_>>).await {
         original_shuffle_state = playback.shuffle_state;
         if original_shuffle_state {
@@ -1087,7 +1173,7 @@ impl Network {
     } else {
       // Resume playback - use native player if available for instant response
       #[cfg(feature = "streaming")]
-      if self.is_native_streaming_active() {
+      if self.is_native_streaming_active_for_playback().await {
         if let Some(ref player) = self.streaming_player {
           player.play();
           // Update UI state immediately
@@ -1104,7 +1190,7 @@ impl Network {
     match result {
       Ok(()) => {
         // Re-enable shuffle if it was on before
-        if should_disable_shuffle && original_shuffle_state {
+        if should_disable_shuffle && original_shuffle_state && !is_native {
           // Small delay to let playback start before re-enabling shuffle
           tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
           let _ = self.spotify.shuffle(true, device_id).await;
@@ -1124,6 +1210,30 @@ impl Network {
         self.get_current_playback().await;
       }
       Err(e) => {
+        // For native streaming, if the API fails (404), try using native player directly
+        #[cfg(feature = "streaming")]
+        if is_native {
+          if let Some(ref player) = self.streaming_player {
+            // Activate and play - the Spirc will handle the actual playback
+            player.activate();
+            player.play();
+
+            // Update UI state
+            {
+              let mut app = self.app.lock().await;
+              app.song_progress_ms = 0;
+              if let Some(ctx) = &mut app.current_playback_context {
+                ctx.is_playing = true;
+              }
+            }
+
+            // Small delay then fetch updated state
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            self.get_current_playback().await;
+            return;
+          }
+        }
+
         // Re-enable shuffle even on error if it was on before
         if should_disable_shuffle && original_shuffle_state {
           let _ = self.spotify.shuffle(true, device_id).await;
@@ -1356,7 +1466,7 @@ impl Network {
   async fn seek(&mut self, position_ms: u32) {
     // Use native streaming player for instant seek (no network delay)
     #[cfg(feature = "streaming")]
-    if self.is_native_streaming_active() {
+    if self.is_native_streaming_active_for_playback().await {
       if let Some(ref player) = self.streaming_player {
         player.seek(position_ms);
         // Update UI immediately without API polling
@@ -1368,10 +1478,10 @@ impl Network {
     }
 
     // Fallback to API-based seek
-    let device_id = self.client_config.device_id.as_deref();
     let position = TimeDelta::milliseconds(position_ms as i64);
 
-    match self.spotify.seek_track(position, device_id).await {
+    // Don't pin commands to a saved device_id; target Spotify's currently active device.
+    match self.spotify.seek_track(position, None).await {
       Ok(()) => {
         // Reduced delay for API seek (still needed for server sync)
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -1420,11 +1530,7 @@ impl Network {
     };
 
     // API-based skip for external players (spotifyd, etc.)
-    match self
-      .spotify
-      .next_track(self.client_config.device_id.as_deref())
-      .await
-    {
+    match self.spotify.next_track(None).await {
       Ok(()) => {
         // Small delay to let the external player process the skip
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -1432,10 +1538,7 @@ impl Network {
         // For external players, proactively resume if we were playing
         // Spotifyd often lands in paused state after skip
         if was_playing {
-          let _ = self
-            .spotify
-            .resume_playback(self.client_config.device_id.as_deref(), None)
-            .await;
+          let _ = self.spotify.resume_playback(None, None).await;
         }
 
         // Small delay then fetch updated state
@@ -1485,11 +1588,7 @@ impl Network {
     };
 
     // API-based skip for external players (spotifyd, etc.)
-    match self
-      .spotify
-      .previous_track(self.client_config.device_id.as_deref())
-      .await
-    {
+    match self.spotify.previous_track(None).await {
       Ok(()) => {
         // Small delay to let the external player process the skip
         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -1497,10 +1596,7 @@ impl Network {
         // For external players, proactively resume if we were playing
         // Spotifyd often lands in paused state after skip
         if was_playing {
-          let _ = self
-            .spotify
-            .resume_playback(self.client_config.device_id.as_deref(), None)
-            .await;
+          let _ = self.spotify.resume_playback(None, None).await;
         }
 
         // Small delay then fetch updated state
@@ -1520,31 +1616,34 @@ impl Network {
     #[cfg(feature = "streaming")]
     if self.is_native_streaming_active_for_playback().await {
       if let Some(ref player) = self.streaming_player {
-        match player.set_shuffle(new_shuffle_state) {
-          Ok(()) => {
-            // Update UI immediately
-            let mut app = self.app.lock().await;
-            if let Some(ctx) = &mut app.current_playback_context {
-              ctx.shuffle_state = new_shuffle_state;
-            }
-            app.user_config.behavior.shuffle_enabled = new_shuffle_state;
-            let _ = app.user_config.save_config();
-            return;
+        // Try to set shuffle on the native player
+        let shuffle_result = player.set_shuffle(new_shuffle_state);
+
+        // Update UI and save config regardless of Spirc result
+        // (Spirc might not be fully ready yet but we still want to save the preference)
+        {
+          let mut app = self.app.lock().await;
+          if let Some(ctx) = &mut app.current_playback_context {
+            ctx.shuffle_state = new_shuffle_state;
           }
-          Err(e) => {
-            // Fall back to API path, but surface the native error for visibility
-            self.handle_error(anyhow!(e)).await;
-          }
+          app.user_config.behavior.shuffle_enabled = new_shuffle_state;
+          let _ = app.user_config.save_config();
         }
+
+        // Log error but don't show error screen - suppress to avoid startup popups
+        if let Err(_e) = shuffle_result {
+          // Silently ignore - Spirc might not be ready yet
+          // The shuffle state will be applied when playback starts
+        }
+
+        // Don't fall back to API - it will fail with 404 for native devices
+        return;
       }
     }
 
-    // Fallback: API-based shuffle (updates UI after API call succeeds)
-    match self
-      .spotify
-      .shuffle(new_shuffle_state, self.client_config.device_id.as_deref())
-      .await
-    {
+    // Fallback: API-based shuffle for external devices (spotifyd, phone, etc.)
+    // Don't pin commands to a saved device_id; target Spotify's currently active device.
+    match self.spotify.shuffle(new_shuffle_state, None).await {
       Ok(()) => {
         // Update the UI eagerly (otherwise the UI will wait until the next 5 second interval
         // due to polling playback context)
@@ -1568,29 +1667,22 @@ impl Network {
       RepeatState::Track => RepeatState::Off,
     };
 
-    // When using native streaming, update UI immediately for instant feedback
+    // When using native streaming, update UI immediately and skip API call
+    // The Web API returns 404 for native streaming devices
     #[cfg(feature = "streaming")]
-    if self.is_native_streaming_active() {
-      {
-        let mut app = self.app.lock().await;
-        if let Some(ctx) = &mut app.current_playback_context {
-          ctx.repeat_state = next_repeat_state;
-        }
+    if self.is_native_streaming_active_for_playback().await {
+      let mut app = self.app.lock().await;
+      if let Some(ctx) = &mut app.current_playback_context {
+        ctx.repeat_state = next_repeat_state;
       }
-      // Still send to API to sync server state (fire and forget - don't wait)
-      let _ = self
-        .spotify
-        .repeat(next_repeat_state, self.client_config.device_id.as_deref())
-        .await;
+      // Note: Spirc handles repeat state internally via Spotify Connect
+      // We just update the UI - the actual state is managed by the Connect session
       return;
     }
 
-    // Fallback: API-based repeat (updates UI after API call succeeds)
-    match self
-      .spotify
-      .repeat(next_repeat_state, self.client_config.device_id.as_deref())
-      .await
-    {
+    // Fallback: API-based repeat for external devices (updates UI after API call succeeds)
+    // Don't pin commands to a saved device_id; target Spotify's currently active device.
+    match self.spotify.repeat(next_repeat_state, None).await {
       Ok(()) => {
         let mut app = self.app.lock().await;
         if let Some(current_playback_context) = &mut app.current_playback_context {
@@ -1606,7 +1698,7 @@ impl Network {
   async fn pause_playback(&mut self) {
     // Use native streaming player for instant pause (no network delay)
     #[cfg(feature = "streaming")]
-    if self.is_native_streaming_active() {
+    if self.is_native_streaming_active_for_playback().await {
       if let Some(ref player) = self.streaming_player {
         player.pause();
         // Update UI state immediately
@@ -1619,11 +1711,8 @@ impl Network {
     }
 
     // Fallback to API-based pause
-    match self
-      .spotify
-      .pause_playback(self.client_config.device_id.as_deref())
-      .await
-    {
+    // Don't pin commands to a saved device_id; target Spotify's currently active device.
+    match self.spotify.pause_playback(None).await {
       Ok(()) => {
         // Update UI immediately instead of full playback poll
         let mut app = self.app.lock().await;
@@ -1678,7 +1767,7 @@ impl Network {
   async fn change_volume(&mut self, volume_percent: u8) {
     // Use native streaming player for instant volume change (no network delay)
     #[cfg(feature = "streaming")]
-    if self.is_native_streaming_active() {
+    if self.is_native_streaming_active_for_playback().await {
       if let Some(ref player) = self.streaming_player {
         player.set_volume(volume_percent);
         // Update UI state immediately
@@ -1694,11 +1783,8 @@ impl Network {
     }
 
     // Fallback to API-based volume control
-    match self
-      .spotify
-      .volume(volume_percent, self.client_config.device_id.as_deref())
-      .await
-    {
+    // Don't pin commands to a saved device_id; target Spotify's currently active device.
+    match self.spotify.volume(volume_percent, None).await {
       Ok(()) => {
         let mut app = self.app.lock().await;
         if let Some(current_playback_context) = &mut app.current_playback_context {
@@ -2366,8 +2452,68 @@ impl Network {
   }
 
   async fn transfert_playback_to_device(&mut self, device_id: String) {
+    // Check if we're selecting the native streaming device
+    // Native streaming uses Spirc (Spotify Connect) which doesn't work with the Web API's transfer_playback
+    #[cfg(feature = "streaming")]
+    {
+      let is_native_device = if let Some(ref player) = self.streaming_player {
+        // Get the device name from the streaming player
+        let native_name = player.device_name().to_lowercase();
+        // Check if any device with this device_id matches the native device name
+        if let Ok(devices) = self.spotify.device().await {
+          devices
+            .iter()
+            .any(|d| d.id.as_ref() == Some(&device_id) && d.name.to_lowercase() == native_name)
+        } else {
+          false
+        }
+      } else {
+        false
+      };
+
+      if is_native_device {
+        // For native streaming device, use Spirc activation instead of Web API
+        // The Web API returns 404 for native streaming devices because they use
+        // a different OAuth session (librespot-oauth)
+        if let Some(ref player) = self.streaming_player {
+          let _ = player.transfer(None);
+          player.activate();
+
+          // Mark streaming as active
+          {
+            let mut app = self.app.lock().await;
+            app.is_streaming_active = true;
+          }
+
+          // Refresh playback state after a brief delay to let Connect register
+          tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+          self.get_current_playback().await;
+
+          // Save device ID and pop navigation
+          match self.client_config.set_device_id(device_id) {
+            Ok(()) => {
+              let mut app = self.app.lock().await;
+              app.pop_navigation_stack();
+            }
+            Err(e) => {
+              self.handle_error(e).await;
+            }
+          };
+          return;
+        }
+      }
+    }
+
+    // Standard path for external devices (spotifyd, phone, etc.)
     match self.spotify.transfer_playback(&device_id, Some(true)).await {
       Ok(()) => {
+        // We're explicitly selecting an external device, so immediately switch the UI/state
+        // out of native streaming mode (the next playback poll will confirm).
+        #[cfg(feature = "streaming")]
+        {
+          let mut app = self.app.lock().await;
+          app.is_streaming_active = false;
+        }
         self.get_current_playback().await;
       }
       Err(e) => {
@@ -2390,38 +2536,49 @@ impl Network {
   /// Auto-select a streaming device by name (used for native spotatui streaming)
   /// This will retry a few times since the device may take a moment to appear in Spotify's device list
   async fn auto_select_streaming_device(&mut self, device_name: String) {
-    // Retry a few times since the device may not appear immediately
-    for attempt in 0..5 {
-      if attempt > 0 {
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    // For native streaming, we use Spirc activation directly instead of the Web API's transfer_playback
+    // The Web API returns 404 for native streaming devices because they use
+    // a different OAuth session (librespot-oauth)
+
+    // Wait a moment for the streaming player to fully register with Spotify Connect
+    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+
+    // Activate the native streaming device via Spirc
+    if let Some(ref player) = self.streaming_player {
+      let _ = player.transfer(None);
+      player.activate();
+
+      // Mark streaming as active
+      {
+        let mut app = self.app.lock().await;
+        app.is_streaming_active = true;
       }
 
-      match self.spotify.device().await {
-        Ok(devices) => {
-          // Find the device by name (case-insensitive)
-          if let Some(device) = devices
-            .iter()
-            .find(|d| d.name.to_lowercase() == device_name.to_lowercase())
-          {
-            if let Some(device_id) = &device.id {
-              // Transfer playback to this device
-              match self.spotify.transfer_playback(device_id, Some(false)).await {
-                Ok(()) => {
-                  // Save device ID to config
-                  let _ = self.client_config.set_device_id(device_id.clone());
-                  return;
-                }
-                Err(_) => {
-                  // Transfer failed, will retry
-                  continue;
-                }
+      // Now try to get the device_id from Spotify's device list and save it
+      // Retry a few times since the device may take a moment to appear
+      for attempt in 0..5 {
+        if attempt > 0 {
+          tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+
+        match self.spotify.device().await {
+          Ok(devices) => {
+            // Find the device by name (case-insensitive)
+            if let Some(device) = devices
+              .iter()
+              .find(|d| d.name.to_lowercase() == device_name.to_lowercase())
+            {
+              if let Some(device_id) = &device.id {
+                // Save device ID to config (don't use transfer_playback - just save the ID)
+                let _ = self.client_config.set_device_id(device_id.clone());
+                return;
               }
             }
           }
-        }
-        Err(_) => {
-          // Failed to get devices, will retry
-          continue;
+          Err(_) => {
+            // Failed to get devices, will retry
+            continue;
+          }
         }
       }
     }
@@ -2436,7 +2593,7 @@ impl Network {
   async fn add_item_to_queue(&mut self, item: PlayableId<'_>) {
     match self
       .spotify
-      .add_item_to_queue(item, self.client_config.device_id.as_deref())
+      .add_item_to_queue(item, None)
       .await
     {
       Ok(()) => (),

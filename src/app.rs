@@ -799,10 +799,20 @@ impl App {
   }
 
   pub fn toggle_playback(&mut self) {
-    if let Some(CurrentPlaybackContext {
-      is_playing: true, ..
-    }) = &self.current_playback_context
-    {
+    let is_playing = if self.is_streaming_active {
+      self
+        .native_is_playing
+        .or_else(|| self.current_playback_context.as_ref().map(|c| c.is_playing))
+        .unwrap_or(false)
+    } else {
+      self
+        .current_playback_context
+        .as_ref()
+        .map(|c| c.is_playing)
+        .unwrap_or(false)
+    };
+
+    if is_playing {
       self.dispatch(IoEvent::PausePlayback);
     } else {
       // When no offset or uris are passed, spotify will resume current playback

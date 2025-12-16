@@ -511,9 +511,7 @@ of the app. Beware that this comes at a CPU cost!",
 
     #[cfg(feature = "streaming")]
     if streaming_player.is_some() {
-      println!("Native playback enabled - 'spotatui' is now your active playback device");
-      // Mark streaming as active so progress updates come from native player, not API
-      app.lock().await.is_streaming_active = true;
+      println!("Native playback enabled - 'spotatui' is available as a Spotify Connect device");
     }
 
     // Clone streaming player and device name for use in network spawn
