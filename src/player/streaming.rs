@@ -16,12 +16,30 @@ use librespot_oauth::OAuthClientBuilder;
 use librespot_playback::{
   audio_backend,
   config::{AudioFormat, PlayerConfig},
+  convert::Converter,
+  decoder::AudioPacket,
   mixer::{softmixer::SoftMixer, Mixer, MixerConfig},
   player::{Player, PlayerEventChannel},
 };
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::{timeout, Duration};
+
+#[derive(Default)]
+struct NullSink;
+
+impl audio_backend::Open for NullSink {
+  fn open(_: Option<String>, _: AudioFormat) -> Self {
+    Self
+  }
+}
+
+impl audio_backend::Sink for NullSink {
+  fn write(&mut self, _: AudioPacket, _: &mut Converter) -> audio_backend::SinkResult<()> {
+    Ok(())
+  }
+}
 
 /// OAuth scopes required for streaming (based on spotify-player)
 const STREAMING_SCOPES: [&str; 6] = [
@@ -183,15 +201,42 @@ impl StreamingPlayer {
     let volume_u16 = (f64::from(config.initial_volume.min(100)) / 100.0 * 65535.0).round() as u16;
     mixer.set_volume(volume_u16);
 
+    let requested_backend = std::env::var("SPOTATUI_STREAMING_AUDIO_BACKEND").ok();
+    let requested_device = std::env::var("SPOTATUI_STREAMING_AUDIO_DEVICE").ok();
+
     // Create audio backend
-    let backend = audio_backend::find(None).ok_or_else(|| anyhow!("No audio backend available"))?;
+    let backend =
+      audio_backend::find(requested_backend.clone()).ok_or_else(|| match requested_backend {
+        Some(name) => anyhow!(
+          "Unknown audio backend '{}'. Available backends: {}",
+          name,
+          audio_backend::BACKENDS
+            .iter()
+            .map(|(n, _)| *n)
+            .collect::<Vec<_>>()
+            .join(", ")
+        ),
+        None => anyhow!("No audio backend available"),
+      })?;
 
     // Create player
     let player = Player::new(
       player_config,
       session.clone(),
       mixer.get_soft_volume(),
-      move || backend(None, AudioFormat::default()),
+      move || {
+        let result = std::panic::catch_unwind(|| backend(requested_device.clone(), AudioFormat::default()));
+        match result {
+          Ok(sink) => sink,
+          Err(_) => {
+            eprintln!(
+              "Failed to initialize audio output backend; falling back to a null sink (no audio). \
+Set SPOTATUI_STREAMING_AUDIO_DEVICE to select an output device, or SPOTATUI_STREAMING_AUDIO_BACKEND to select a backend."
+            );
+            Box::new(NullSink::default())
+          }
+        }
+      },
     );
 
     // Create Connect configuration
@@ -206,21 +251,33 @@ impl StreamingPlayer {
 
     println!("Initializing Spirc with device_id={}", session.device_id());
 
+    let init_timeout_secs = std::env::var("SPOTATUI_STREAMING_INIT_TIMEOUT_SECS")
+      .ok()
+      .and_then(|v| v.parse::<u64>().ok())
+      .filter(|&v| v > 0)
+      .unwrap_or(30);
+
     // Create Spirc (Spotify Connect controller)
-    let (spirc, spirc_task) = match Spirc::new(
+    let spirc_new = Spirc::new(
       connect_config,
       session.clone(),
       credentials,
       player.clone(),
       mixer.clone(),
-    )
-    .await
+    );
+
+    let (spirc, spirc_task) = match timeout(Duration::from_secs(init_timeout_secs), spirc_new).await
     {
-      Ok(result) => result,
-      Err(e) => {
-        // Log the actual error for debugging
+      Ok(Ok(result)) => result,
+      Ok(Err(e)) => {
         println!("Spirc creation error: {:?}", e);
         return Err(anyhow!("Failed to create Spirc: {:?}", e));
+      }
+      Err(_) => {
+        return Err(anyhow!(
+          "Spirc initialization timed out after {}s (set SPOTATUI_STREAMING_INIT_TIMEOUT_SECS to adjust)",
+          init_timeout_secs
+        ));
       }
     };
 

@@ -73,7 +73,7 @@ use rspotify::{
 use std::{
   cmp::{max, min},
   fs,
-  io::{self, stdout},
+  io::{self, stdout, Write},
   panic,
   path::PathBuf,
   sync::{
@@ -151,10 +151,37 @@ fn install_panic_hook() {
     let _ = disable_raw_mode();
     let mut stdout = io::stdout();
     let _ = execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
+    let panic_log_path = dirs::home_dir().map(|home| {
+      home
+        .join(".config")
+        .join("spotatui")
+        .join("spotatui_panic.log")
+    });
+
+    if let Some(path) = panic_log_path.as_ref() {
+      if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+      }
+      if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "\n==== spotatui panic ====");
+        let _ = writeln!(f, "{}", info);
+        let _ = writeln!(f, "{:?}", Backtrace::new());
+      }
+      eprintln!(
+        "A crash log was written to: {}",
+        path.to_string_lossy()
+      );
+    }
     default_hook(info);
 
     if cfg!(debug_assertions) && std::env::var_os("RUST_BACKTRACE").is_none() {
       eprintln!("{:?}", Backtrace::new());
+    }
+
+    if cfg!(target_os = "windows") && std::env::var_os("SPOTATUI_PAUSE_ON_PANIC").is_some() {
+      eprintln!("Press Enter to close...");
+      let mut s = String::new();
+      let _ = std::io::stdin().read_line(&mut s);
     }
   }));
 }
@@ -474,25 +501,46 @@ of the app. Beware that this comes at a CPU cost!",
       let client_id = client_config.client_id.clone();
       let redirect_uri = client_config.get_redirect_uri();
 
-      let init_handle = tokio::spawn(async move {
+      let mut init_handle = tokio::spawn(async move {
         player::StreamingPlayer::new(&client_id, &redirect_uri, streaming_config).await
       });
 
-      match init_handle.await {
-        Ok(Ok(p)) => {
+      let init_timeout_secs = std::env::var("SPOTATUI_STREAMING_INIT_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(30);
+
+      let init_result = tokio::select! {
+        res = &mut init_handle => Some(res),
+        _ = tokio::time::sleep(std::time::Duration::from_secs(init_timeout_secs)) => {
+          init_handle.abort();
+          None
+        }
+      };
+
+      match init_result {
+        Some(Ok(Ok(p))) => {
           println!("Streaming player initialized as '{}'", p.device_name());
           // Note: We don't activate() here - that's handled by AutoSelectStreamingDevice
           // which respects the user's saved device preference (e.g., spotifyd)
           Some(Arc::new(p))
         }
-        Ok(Err(e)) => {
+        Some(Ok(Err(e))) => {
           println!("Failed to initialize streaming: {}", e);
           println!("Falling back to API-based playback control");
           None
         }
-        Err(e) => {
+        Some(Err(e)) => {
           println!("Streaming initialization panicked: {}", e);
           println!("Falling back to API-based playback control");
+          None
+        }
+        None => {
+          println!(
+            "Streaming initialization timed out after {}s; falling back to API-based playback control (set SPOTATUI_STREAMING_INIT_TIMEOUT_SECS to adjust)",
+            init_timeout_secs
+          );
           None
         }
       }
