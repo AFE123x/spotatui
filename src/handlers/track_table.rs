@@ -273,22 +273,21 @@ fn play_random_song(app: &mut App) {
         }
       }
       TrackTableContext::DiscoverPlaylist => {
-        // Play random track from currently displayed discover playlist
-        let num_tracks = app.track_table.tracks.len();
-        if num_tracks > 0 {
-          if let Some(track) = app
-            .track_table
-            .tracks
-            .get(thread_rng().gen_range(0..num_tracks))
-          {
-            if let Some(playable_id) = track_playable_id(track.id.clone()) {
-              app.dispatch(IoEvent::StartPlayback(
-                None,
-                Some(vec![playable_id]),
-                Some(0),
-              ));
-            }
+        // Play random track from currently displayed discover playlist, but keep the full list
+        // so next/previous can continue within the mix.
+        let mut playable_ids: Vec<PlayableId<'static>> = Vec::new();
+        for track in &app.track_table.tracks {
+          if let Some(playable_id) = track_playable_id(track.id.clone()) {
+            playable_ids.push(playable_id);
           }
+        }
+        if !playable_ids.is_empty() {
+          let rand_idx = thread_rng().gen_range(0..playable_ids.len());
+          app.dispatch(IoEvent::StartPlayback(
+            None,
+            Some(playable_ids),
+            Some(rand_idx),
+          ));
         }
       }
     }
@@ -459,15 +458,25 @@ fn on_enter(app: &mut App) {
         };
       }
       TrackTableContext::DiscoverPlaylist => {
-        // Play selected track from discover playlist
-        if let Some(track) = tracks.get(*selected_index) {
+        // Play the selected track, but include the full discover list so playback can continue.
+        let mut playable_ids: Vec<PlayableId<'static>> = Vec::new();
+        let mut selected_offset: Option<usize> = None;
+
+        for (idx, track) in tracks.iter().enumerate() {
           if let Some(playable_id) = track_playable_id(track.id.clone()) {
-            app.dispatch(IoEvent::StartPlayback(
-              None,
-              Some(vec![playable_id]),
-              Some(0),
-            ));
+            if idx == *selected_index {
+              selected_offset = Some(playable_ids.len());
+            }
+            playable_ids.push(playable_id);
           }
+        }
+
+        if !playable_ids.is_empty() {
+          app.dispatch(IoEvent::StartPlayback(
+            None,
+            Some(playable_ids),
+            Some(selected_offset.unwrap_or(0)),
+          ));
         }
       }
     }
