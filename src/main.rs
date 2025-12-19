@@ -65,6 +65,8 @@ use crossterm::{
 use network::{IoEvent, Network};
 use ratatui::{
   backend::{Backend, CrosstermBackend},
+  style::Style,
+  widgets::Block,
   Terminal,
 };
 use redirect_uri::redirect_uri_web_server;
@@ -1567,15 +1569,21 @@ async fn start_ui(
       };
 
       let current_route = app.get_current_route();
-      terminal.draw(|f| match current_route.active_block {
-        ActiveBlock::HelpMenu => ui::draw_help_menu(f, &app),
-        ActiveBlock::Error => ui::draw_error_screen(f, &app),
-        ActiveBlock::SelectDevice => ui::draw_device_list(f, &app),
-        ActiveBlock::Analysis => ui::audio_analysis::draw(f, &app),
-        ActiveBlock::BasicView => ui::draw_basic_view(f, &app),
-        ActiveBlock::UpdatePrompt => ui::draw_update_prompt(f, &app),
-        ActiveBlock::Settings => ui::settings::draw_settings(f, &app),
-        _ => ui::draw_main_layout(f, &app),
+      terminal.draw(|f| {
+        f.render_widget(
+          Block::default().style(Style::default().bg(app.user_config.theme.background)),
+          f.size(),
+        );
+        match current_route.active_block {
+          ActiveBlock::HelpMenu => ui::draw_help_menu(f, &app),
+          ActiveBlock::Error => ui::draw_error_screen(f, &app),
+          ActiveBlock::SelectDevice => ui::draw_device_list(f, &app),
+          ActiveBlock::Analysis => ui::audio_analysis::draw(f, &app),
+          ActiveBlock::BasicView => ui::draw_basic_view(f, &app),
+          ActiveBlock::UpdatePrompt => ui::draw_update_prompt(f, &app),
+          ActiveBlock::Settings => ui::settings::draw_settings(f, &app),
+          _ => ui::draw_main_layout(f, &app),
+        }
       })?;
 
       if current_route.active_block == ActiveBlock::Input {
