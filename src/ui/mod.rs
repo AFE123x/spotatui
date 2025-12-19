@@ -141,6 +141,7 @@ pub fn draw_input_and_help_box(f: &mut Frame<'_>, app: &App, layout_chunk: Rect)
         "Search",
         get_color(highlight_state, app.user_config.theme),
       ))
+      .style(app.user_config.theme.base_style())
       .border_style(get_color(highlight_state, app.user_config.theme)),
   );
   f.render_widget(input, chunks[0]);
@@ -158,9 +159,11 @@ pub fn draw_input_and_help_box(f: &mut Frame<'_>, app: &App, layout_chunk: Rect)
     .border_style(Style::default().fg(help_block_text.0));
 
   let lines = Text::from(help_block_text.1);
-  let help = Paragraph::new(lines)
-    .block(block)
-    .style(Style::default().fg(help_block_text.0));
+  let help = Paragraph::new(lines).block(block).style(
+    Style::default()
+      .fg(help_block_text.0)
+      .bg(app.user_config.theme.background),
+  );
   f.render_widget(help, chunks[1]);
 }
 
@@ -1070,6 +1073,7 @@ pub fn draw_playbar(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
 
       let title_block = Block::default()
         .borders(Borders::ALL)
+        .style(Style::default().bg(app.user_config.theme.playbar_background))
         .title(Span::styled(
           &title,
           get_color(highlight_state, app.user_config.theme),
@@ -1246,6 +1250,7 @@ fn draw_home(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
       "Welcome!",
       get_color(highlight_state, app.user_config.theme),
     ))
+    .style(app.user_config.theme.base_style())
     .borders(Borders::ALL)
     .border_style(get_color(highlight_state, app.user_config.theme));
   f.render_widget(welcome, layout_chunk);
@@ -1265,7 +1270,7 @@ fn draw_home(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
 
   // Contains the banner
   let top_text = Paragraph::new(top_text)
-    .style(Style::default().fg(app.user_config.theme.text))
+    .style(app.user_config.theme.base_style())
     .block(Block::default());
   f.render_widget(top_text, chunks[0]);
 
@@ -1300,6 +1305,7 @@ fn draw_home(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
   // CHANGELOG
   let bottom_text = Paragraph::new(changelog_lines)
     .block(Block::default())
+    .style(app.user_config.theme.base_style())
     .wrap(Wrap { trim: false })
     .scroll((app.home_scroll, 0));
   f.render_widget(bottom_text, chunks[1]);
@@ -1982,7 +1988,7 @@ fn draw_selectable_list<S>(
         .borders(Borders::ALL)
         .border_style(get_color(highlight_state, app.user_config.theme)),
     )
-    .style(Style::default().fg(app.user_config.theme.text))
+    .style(app.user_config.theme.base_style())
     .highlight_style(
       get_color(highlight_state, app.user_config.theme).add_modifier(Modifier::BOLD),
     );
@@ -2106,7 +2112,7 @@ fn draw_table(
 
   let rows = items.iter().skip(offset).enumerate().map(|(i, item)| {
     let mut formatted_row = item.format.clone();
-    let mut style = Style::default().fg(app.user_config.theme.text); // default styling
+    let mut style = app.user_config.theme.base_style(); // default styling
 
     // if table displays songs
     match header.id {
@@ -2172,14 +2178,14 @@ fn draw_table(
     .block(
       Block::default()
         .borders(Borders::ALL)
-        .style(Style::default().fg(app.user_config.theme.text))
+        .style(app.user_config.theme.base_style())
         .title(Span::styled(
           title,
           get_color(highlight_state, app.user_config.theme),
         ))
         .border_style(get_color(highlight_state, app.user_config.theme)),
     )
-    .style(Style::default().fg(app.user_config.theme.text));
+    .style(app.user_config.theme.base_style());
   f.render_widget(table, layout_chunk);
 }
 

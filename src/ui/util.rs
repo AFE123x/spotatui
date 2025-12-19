@@ -34,9 +34,9 @@ pub fn get_artist_highlight_state(app: &App, block_to_match: ArtistBlock) -> (bo
 
 pub fn get_color((is_active, is_hovered): (bool, bool), theme: Theme) -> Style {
   match (is_active, is_hovered) {
-    (true, _) => Style::default().fg(theme.selected),
-    (false, true) => Style::default().fg(theme.hovered),
-    _ => Style::default().fg(theme.inactive),
+    (true, _) => Style::default().fg(theme.selected).bg(theme.background),
+    (false, true) => Style::default().fg(theme.hovered).bg(theme.background),
+    _ => Style::default().fg(theme.inactive).bg(theme.background),
   }
 }
 
