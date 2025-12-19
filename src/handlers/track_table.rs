@@ -39,28 +39,8 @@ pub fn handler(key: Key, app: &mut App) {
               }
             }
           }
-          Some(TrackTableContext::MadeForYou) => {
-            let (playlists, selected_playlist_index) =
-              (&app.library.made_for_you_playlists, &app.made_for_you_index);
-            if let Some(selected_playlist) = playlists
-              .get_results(Some(0))
-              .unwrap()
-              .items
-              .get(*selected_playlist_index)
-            {
-              if let Some(playlist_tracks) = &app.made_for_you_tracks {
-                if app.made_for_you_offset + app.large_search_limit < playlist_tracks.total {
-                  app.made_for_you_offset += app.large_search_limit;
-                  let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
-                  app.dispatch(IoEvent::GetMadeForYouPlaylistItems(
-                    playlist_id,
-                    app.made_for_you_offset,
-                  ));
-                  app.track_table.selected_index = 0;
-                  return;
-                }
-              }
-            }
+          Some(TrackTableContext::DiscoverPlaylist) => {
+            // Discover playlists don't support pagination
           }
           Some(TrackTableContext::SavedTracks) => {
             // Check if there are more saved tracks to load
@@ -108,26 +88,8 @@ pub fn handler(key: Key, app: &mut App) {
               }
             }
           }
-          Some(TrackTableContext::MadeForYou) => {
-            if app.made_for_you_offset > 0 {
-              let (playlists, selected_playlist_index) =
-                (&app.library.made_for_you_playlists, &app.made_for_you_index);
-              if let Some(selected_playlist) = playlists
-                .get_results(Some(0))
-                .and_then(|p| p.items.get(*selected_playlist_index))
-              {
-                app.made_for_you_offset = app
-                  .made_for_you_offset
-                  .saturating_sub(app.large_search_limit);
-                let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
-                app.dispatch(IoEvent::GetMadeForYouPlaylistItems(
-                  playlist_id,
-                  app.made_for_you_offset,
-                ));
-                app.track_table.selected_index = app.large_search_limit.saturating_sub(1) as usize;
-                return;
-              }
-            }
+          Some(TrackTableContext::DiscoverPlaylist) => {
+            // Discover playlists don't support pagination
           }
           Some(TrackTableContext::SavedTracks) => {
             // Check if there are previous saved tracks to load
@@ -190,28 +152,7 @@ pub fn handler(key: Key, app: &mut App) {
           }
           TrackTableContext::AlbumSearch => {}
           TrackTableContext::PlaylistSearch => {}
-          TrackTableContext::MadeForYou => {
-            let (playlists, selected_playlist_index) =
-              (&app.library.made_for_you_playlists, &app.made_for_you_index);
-
-            if let Some(selected_playlist) = playlists
-              .get_results(Some(0))
-              .unwrap()
-              .items
-              .get(selected_playlist_index.to_owned())
-            {
-              if let Some(playlist_tracks) = &app.made_for_you_tracks {
-                if app.made_for_you_offset + app.large_search_limit < playlist_tracks.total {
-                  app.made_for_you_offset += app.large_search_limit;
-                  let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
-                  app.dispatch(IoEvent::GetMadeForYouPlaylistItems(
-                    playlist_id,
-                    app.made_for_you_offset,
-                  ));
-                }
-              }
-            }
-          }
+          TrackTableContext::DiscoverPlaylist => {}
         }
       };
     }
@@ -240,26 +181,7 @@ pub fn handler(key: Key, app: &mut App) {
           }
           TrackTableContext::AlbumSearch => {}
           TrackTableContext::PlaylistSearch => {}
-          TrackTableContext::MadeForYou => {
-            let (playlists, selected_playlist_index) = (
-              &app
-                .library
-                .made_for_you_playlists
-                .get_results(Some(0))
-                .unwrap(),
-              app.made_for_you_index,
-            );
-            if app.made_for_you_offset >= app.large_search_limit {
-              app.made_for_you_offset -= app.large_search_limit;
-            }
-            if let Some(selected_playlist) = playlists.items.get(selected_playlist_index) {
-              let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
-              app.dispatch(IoEvent::GetMadeForYouPlaylistItems(
-                playlist_id,
-                app.made_for_you_offset,
-              ));
-            }
-          }
+          TrackTableContext::DiscoverPlaylist => {}
         }
       };
     }
@@ -350,21 +272,23 @@ fn play_random_song(app: &mut App) {
           ))
         }
       }
-      TrackTableContext::MadeForYou => {
-        if let Some(playlist) = &app
-          .library
-          .made_for_you_playlists
-          .get_results(Some(0))
-          .and_then(|playlist| playlist.items.get(app.made_for_you_index))
-        {
-          let num_tracks = playlist.tracks.total as usize;
-          let context_id = Some(playlist_context_id_from_ref(&playlist.id));
+      TrackTableContext::DiscoverPlaylist => {
+        // Play random track from currently displayed discover playlist, but keep the full list
+        // so next/previous can continue within the mix.
+        let mut playable_ids: Vec<PlayableId<'static>> = Vec::new();
+        for track in &app.track_table.tracks {
+          if let Some(playable_id) = track_playable_id(track.id.clone()) {
+            playable_ids.push(playable_id);
+          }
+        }
+        if !playable_ids.is_empty() {
+          let rand_idx = thread_rng().gen_range(0..playable_ids.len());
           app.dispatch(IoEvent::StartPlayback(
-            context_id,
             None,
-            Some(thread_rng().gen_range(0..num_tracks)),
+            Some(playable_ids),
+            Some(rand_idx),
           ));
-        };
+        }
       }
     }
   };
@@ -413,7 +337,7 @@ fn jump_to_end(app: &mut App) {
       TrackTableContext::SavedTracks => {}
       TrackTableContext::AlbumSearch => {}
       TrackTableContext::PlaylistSearch => {}
-      TrackTableContext::MadeForYou => {}
+      TrackTableContext::DiscoverPlaylist => {}
     }
   }
 }
@@ -533,21 +457,25 @@ fn on_enter(app: &mut App) {
           ));
         };
       }
-      TrackTableContext::MadeForYou => {
-        if let Some(_track) = tracks.get(*selected_index) {
-          let context_id = app
-            .library
-            .made_for_you_playlists
-            .get_results(Some(0))
-            .unwrap()
-            .items
-            .get(app.made_for_you_index)
-            .map(|playlist| playlist_context_id_from_ref(&playlist.id));
+      TrackTableContext::DiscoverPlaylist => {
+        // Play the selected track, but include the full discover list so playback can continue.
+        let mut playable_ids: Vec<PlayableId<'static>> = Vec::new();
+        let mut selected_offset: Option<usize> = None;
 
+        for (idx, track) in tracks.iter().enumerate() {
+          if let Some(playable_id) = track_playable_id(track.id.clone()) {
+            if idx == *selected_index {
+              selected_offset = Some(playable_ids.len());
+            }
+            playable_ids.push(playable_id);
+          }
+        }
+
+        if !playable_ids.is_empty() {
           app.dispatch(IoEvent::StartPlayback(
-            context_id,
             None,
-            Some(app.track_table.selected_index + app.made_for_you_offset as usize),
+            Some(playable_ids),
+            Some(selected_offset.unwrap_or(0)),
           ));
         }
       }
@@ -599,7 +527,7 @@ fn on_queue(app: &mut App) {
           }
         };
       }
-      TrackTableContext::MadeForYou => {
+      TrackTableContext::DiscoverPlaylist => {
         if let Some(track) = tracks.get(*selected_index) {
           if let Some(playable_id) = track_playable_id(track.id.clone()) {
             app.dispatch(IoEvent::AddItemToQueue(playable_id));
@@ -628,7 +556,7 @@ fn jump_to_start(app: &mut App) {
       TrackTableContext::SavedTracks => {}
       TrackTableContext::AlbumSearch => {}
       TrackTableContext::PlaylistSearch => {}
-      TrackTableContext::MadeForYou => {}
+      TrackTableContext::DiscoverPlaylist => {}
     }
   }
 }

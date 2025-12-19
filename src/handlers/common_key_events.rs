@@ -105,8 +105,8 @@ pub fn handle_right_event(app: &mut App) {
           Some(ActiveBlock::EpisodeTable),
         );
       }
-      RouteId::MadeForYou => {
-        app.set_current_route_state(Some(ActiveBlock::MadeForYou), Some(ActiveBlock::MadeForYou));
+      RouteId::Discover => {
+        app.set_current_route_state(Some(ActiveBlock::Discover), Some(ActiveBlock::Discover));
       }
       RouteId::Artists => {
         app.set_current_route_state(Some(ActiveBlock::Artists), Some(ActiveBlock::Artists));

@@ -416,7 +416,7 @@ mod tests {
     const URL_BASE: &str = "https://open.spotify.com/";
 
     fn check_uri_parse(expected_id: &str, parsed: (String, bool)) {
-      assert_eq!(parsed.1, true);
+      assert!(parsed.1);
       assert_eq!(parsed.0, expected_id);
     }
 
@@ -477,13 +477,13 @@ mod tests {
       let totally_wrong = "hehe-haha-3aNsrV6lkzmcU1w8u8kA7N";
       let random = "random string";
       let (_, matched) = spotify_resource_id(URI_BASE, swapped, ":", "track");
-      assert_eq!(matched, false);
+      assert!(!matched);
       let (_, matched) = spotify_resource_id(URI_BASE, totally_wrong, ":", "track");
-      assert_eq!(matched, false);
+      assert!(!matched);
       let (_, matched) = spotify_resource_id(URL_BASE, totally_wrong, "/", "track");
-      assert_eq!(matched, false);
+      assert!(!matched);
       let (_, matched) = spotify_resource_id(URL_BASE, random, "/", "track");
-      assert_eq!(matched, false);
+      assert!(!matched);
     }
 
     #[test]
@@ -496,12 +496,12 @@ mod tests {
       let expected_id = "1cJ6lPBYj2fscs0kqBHsVV";
 
       let (actual_id, matched) = spotify_resource_id(URL_BASE, playlist_url, "/", "playlist");
-      assert_eq!(matched, true);
+      assert!(matched);
       assert_eq!(actual_id, expected_id);
 
       let (actual_id, matched) =
         spotify_resource_id(URL_BASE, playlist_url_with_query, "/", "playlist");
-      assert_eq!(matched, true);
+      assert!(matched);
       assert_eq!(actual_id, expected_id);
     }
 
@@ -510,7 +510,7 @@ mod tests {
       let playlist_url =
         "https://open.spotify.com/playlist/1cJ6lPBYj2fscs0kqBHsVV?si=OdwuJsbsSeuUAOadehng3A";
       let (_, matched) = spotify_resource_id(URL_BASE, playlist_url, "/", "album");
-      assert_eq!(matched, false);
+      assert!(!matched);
     }
   }
 }

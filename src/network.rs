@@ -14,7 +14,7 @@ use rspotify::{
     enums::{AdditionalType, Country, RepeatState, SearchType},
     idtypes::{AlbumId, ArtistId, PlayContextId, PlayableId, PlaylistId, ShowId, TrackId, UserId},
     page::Page,
-    playlist::{PlaylistItem, SimplifiedPlaylist},
+    playlist::PlaylistItem,
     recommend::Recommendations,
     search::SearchResult,
     show::SimplifiedShow,
@@ -47,7 +47,6 @@ pub enum IoEvent {
   GetDevices,
   GetSearchResults(String, Option<Country>),
   SetTracksToTable(Vec<FullTrack>),
-  GetMadeForYouPlaylistItems(PlaylistId<'static>, u32),
   GetPlaylistItems(PlaylistId<'static>, u32),
   GetCurrentSavedTracks(Option<u32>),
   StartPlayback(
@@ -79,7 +78,6 @@ pub enum IoEvent {
   UserFollowArtists(Vec<ArtistId<'static>>),
   UserFollowPlaylist(UserId<'static>, PlaylistId<'static>, Option<bool>),
   UserUnfollowPlaylist(UserId<'static>, PlaylistId<'static>),
-  MadeForYouSearchAndAdd(String, Option<Country>),
   GetUser,
   ToggleSaveTrack(PlayableId<'static>),
   GetRecommendationsForTrackId(TrackId<'static>, Option<Country>),
@@ -114,6 +112,10 @@ pub enum IoEvent {
   PreFetchAllSavedTracks,
   /// Pre-fetch all tracks from a playlist in background
   PreFetchAllPlaylistTracks(PlaylistId<'static>),
+  /// Get user's top tracks for Discover feature (with time range)
+  GetUserTopTracks(crate::app::DiscoverTimeRange),
+  /// Get Top Artists Mix - fetches top artists and their top tracks
+  GetTopArtistsMix,
 }
 
 pub struct Network {
@@ -201,7 +203,7 @@ impl Network {
       .map(|p| p.device_name().to_lowercase());
     {
       let app = self.app.lock().await;
-      if let (Some(ref ctx), Some(ref native_name)) =
+      if let (Some(ref ctx), Some(native_name)) =
         (&app.current_playback_context, native_device_name.as_ref())
       {
         let current_device_name = ctx.device.name.to_lowercase();
@@ -253,11 +255,7 @@ impl Network {
       IoEvent::GetSearchResults(search_term, country) => {
         self.get_search_results(search_term, country).await;
       }
-      IoEvent::GetMadeForYouPlaylistItems(playlist_id, made_for_you_offset) => {
-        self
-          .get_made_for_you_playlist_tracks(playlist_id, made_for_you_offset)
-          .await;
-      }
+
       IoEvent::GetPlaylistItems(playlist_id, playlist_offset) => {
         self.get_playlist_tracks(playlist_id, playlist_offset).await;
       }
@@ -326,9 +324,7 @@ impl Network {
       IoEvent::UserUnfollowPlaylist(user_id, playlist_id) => {
         self.user_unfollow_playlist(user_id, playlist_id).await;
       }
-      IoEvent::MadeForYouSearchAndAdd(search_term, country) => {
-        self.made_for_you_search_and_add(search_term, country).await;
-      }
+
       IoEvent::ToggleSaveTrack(track_id) => {
         self.toggle_save_track(track_id).await;
       }
@@ -421,6 +417,12 @@ impl Network {
           Self::prefetch_all_playlist_tracks_task(spotify, app, large_search_limit, playlist_id)
             .await;
         });
+      }
+      IoEvent::GetUserTopTracks(time_range) => {
+        self.get_user_top_tracks(time_range).await;
+      }
+      IoEvent::GetTopArtistsMix => {
+        self.get_top_artists_mix().await;
       }
     };
 
@@ -722,39 +724,6 @@ impl Network {
   async fn set_artists_to_table(&mut self, artists: Vec<FullArtist>) {
     let mut app = self.app.lock().await;
     app.artists = artists;
-  }
-
-  async fn get_made_for_you_playlist_tracks(
-    &mut self,
-    playlist_id: PlaylistId<'_>,
-    made_for_you_offset: u32,
-  ) {
-    match self
-      .spotify
-      .playlist_items_manual(
-        playlist_id,
-        None,
-        None,
-        Some(self.large_search_limit),
-        Some(made_for_you_offset),
-      )
-      .await
-    {
-      Ok(made_for_you_tracks) => {
-        self
-          .set_playlist_tracks_to_table(&made_for_you_tracks)
-          .await;
-
-        let mut app = self.app.lock().await;
-        app.made_for_you_tracks = Some(made_for_you_tracks);
-        if app.get_current_route().id != RouteId::TrackTable {
-          app.push_navigation_stack(RouteId::TrackTable, ActiveBlock::TrackTable);
-        }
-      }
-      Err(e) => {
-        self.handle_error(anyhow!(e)).await;
-      }
-    }
   }
 
   async fn get_current_user_saved_shows(&mut self, offset: Option<u32>) {
@@ -2341,56 +2310,6 @@ impl Network {
     }
   }
 
-  async fn made_for_you_search_and_add(&mut self, search_string: String, country: Option<Country>) {
-    const SPOTIFY_ID: &str = "spotify";
-    let market = country.map(Market::Country);
-
-    match self
-      .spotify
-      .search(
-        &search_string,
-        SearchType::Playlist,
-        market,
-        None, // include_external
-        Some(self.large_search_limit),
-        Some(0),
-      )
-      .await
-    {
-      Ok(SearchResult::Playlists(mut search_playlists)) => {
-        let mut filtered_playlists = search_playlists
-          .items
-          .iter()
-          .filter(|playlist| {
-            playlist.owner.id.to_string() == SPOTIFY_ID && playlist.name == search_string
-          })
-          .map(|playlist| playlist.to_owned())
-          .collect::<Vec<SimplifiedPlaylist>>();
-
-        let mut app = self.app.lock().await;
-        if !app.library.made_for_you_playlists.pages.is_empty() {
-          app
-            .library
-            .made_for_you_playlists
-            .get_mut_results(None)
-            .unwrap()
-            .items
-            .append(&mut filtered_playlists);
-        } else {
-          search_playlists.items = filtered_playlists;
-          app
-            .library
-            .made_for_you_playlists
-            .add_pages(search_playlists);
-        }
-      }
-      Err(e) => {
-        self.handle_error(anyhow!(e)).await;
-      }
-      _ => {}
-    }
-  }
-
   async fn get_current_user_playlists(&mut self) {
     let playlists = self
       .spotify
@@ -2798,5 +2717,119 @@ impl Network {
     let ms_val = if ms_part.len() == 2 { ms * 10 } else { ms };
 
     Some(min * 60000 + sec * 1000 + ms_val)
+  }
+
+  /// Fetch user's top tracks for the Discover feature
+  async fn get_user_top_tracks(&mut self, time_range: crate::app::DiscoverTimeRange) {
+    use crate::app::DiscoverTimeRange;
+    use futures::stream::StreamExt;
+    use rspotify::model::TimeRange;
+
+    let spotify_time_range = match time_range {
+      DiscoverTimeRange::Short => TimeRange::ShortTerm,
+      DiscoverTimeRange::Medium => TimeRange::MediumTerm,
+      DiscoverTimeRange::Long => TimeRange::LongTerm,
+    };
+
+    {
+      let mut app = self.app.lock().await;
+      app.discover_loading = true;
+    }
+
+    let spotify = self.spotify.clone();
+    let mut stream = spotify.current_user_top_tracks(Some(spotify_time_range));
+    let mut tracks = vec![];
+
+    while let Some(item) = stream.next().await {
+      match item {
+        Ok(track) => tracks.push(track),
+        Err(e) => {
+          self.handle_error(anyhow!(e)).await;
+          break;
+        }
+      }
+      if tracks.len() >= 50 {
+        break;
+      }
+    }
+
+    let mut app = self.app.lock().await;
+    app.discover_top_tracks = tracks.clone();
+    app.discover_loading = false;
+
+    // Automatically switch to track table to show results
+    app.track_table.tracks = tracks;
+    app.track_table.context = Some(crate::app::TrackTableContext::DiscoverPlaylist);
+    app.track_table.selected_index = 0;
+    app.push_navigation_stack(
+      crate::app::RouteId::TrackTable,
+      crate::app::ActiveBlock::TrackTable,
+    );
+  }
+
+  /// Fetch Top Artists Mix - fetches top artists and then their top tracks to create a mix
+  async fn get_top_artists_mix(&mut self) {
+    use futures::stream::StreamExt;
+    use rand::seq::SliceRandom;
+    use rspotify::model::TimeRange;
+
+    {
+      let mut app = self.app.lock().await;
+      app.discover_loading = true;
+    }
+
+    let spotify = self.spotify.clone();
+    let mut artists_stream = spotify.current_user_top_artists(Some(TimeRange::MediumTerm));
+    let mut artists = vec![];
+
+    while let Some(item) = artists_stream.next().await {
+      match item {
+        Ok(artist) => artists.push(artist),
+        Err(e) => {
+          self.handle_error(anyhow!(e)).await;
+          break;
+        }
+      }
+      if artists.len() >= 10 {
+        break;
+      }
+    }
+
+    let mut all_tracks = vec![];
+    let user_country = {
+      let app = self.app.lock().await;
+      app.get_user_country()
+    };
+    let market = user_country.map(Market::Country);
+
+    for artist in artists {
+      if let Ok(top_tracks) = self
+        .spotify
+        .artist_top_tracks(artist.id.clone(), market)
+        .await
+      {
+        // Take a few top tracks from each artist
+        all_tracks.extend(top_tracks.into_iter().take(3));
+      }
+    }
+
+    // Shuffle the mix
+    {
+      let mut rng = rand::thread_rng();
+      all_tracks.shuffle(&mut rng);
+    }
+
+    let mut app = self.app.lock().await;
+    app.discover_artists_mix = all_tracks.clone();
+    app.discover_loading = false;
+
+    // Automatically switch to track table to show results
+    app.track_table.tracks = all_tracks;
+    app.track_table.context = Some(crate::app::TrackTableContext::DiscoverPlaylist);
+    app.track_table.selected_index = 0;
+    app.push_navigation_stack(
+      crate::app::RouteId::TrackTable,
+      crate::app::ActiveBlock::TrackTable,
+    );
   }
 }

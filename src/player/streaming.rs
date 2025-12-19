@@ -234,7 +234,7 @@ impl StreamingPlayer {
               "Failed to initialize audio output backend; falling back to a null sink (no audio). \
 Set SPOTATUI_STREAMING_AUDIO_DEVICE to select an output device, or SPOTATUI_STREAMING_AUDIO_BACKEND to select a backend."
             );
-            Box::new(NullSink::default())
+            Box::new(NullSink)
           }
         }
       },

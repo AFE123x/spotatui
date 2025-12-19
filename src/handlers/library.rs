@@ -35,10 +35,8 @@ pub fn handler(key: Key, app: &mut App) {
     // `library` should probably be an array of structs with enums rather than just using indexes
     // like this
     Key::Enter => match app.library.selected_index {
-      // Made For You,
       0 => {
-        app.get_made_for_you();
-        app.push_navigation_stack(RouteId::MadeForYou, ActiveBlock::MadeForYou);
+        app.push_navigation_stack(RouteId::Discover, ActiveBlock::Discover);
       }
       // Recently Played,
       1 => {

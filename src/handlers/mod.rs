@@ -6,6 +6,7 @@ mod artists;
 mod basic_view;
 mod common_key_events;
 mod dialog;
+mod discover;
 mod empty;
 mod episode_table;
 mod error_screen;
@@ -13,7 +14,6 @@ mod help_menu;
 mod home;
 mod input;
 mod library;
-mod made_for_you;
 mod playbar;
 mod playlist;
 mod podcasts;
@@ -161,8 +161,8 @@ fn handle_block_events(key: Key, app: &mut App) {
     ActiveBlock::Artists => {
       artists::handler(key, app);
     }
-    ActiveBlock::MadeForYou => {
-      made_for_you::handler(key, app);
+    ActiveBlock::Discover => {
+      discover::handler(key, app);
     }
     ActiveBlock::Podcasts => {
       podcasts::handler(key, app);
