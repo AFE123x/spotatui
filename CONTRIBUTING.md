@@ -1,44 +1,93 @@
 # Contributing to spotatui
 
-Thanks for taking the time to improve spotatui! This guide explains how to set up a dev environment, run checks, and open a helpful pull request.
+Thanks for your interest in spotatui! 💚 We welcome all kinds of contributions, not just code.
 
-## Ground rules
-- Be kind and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
-- Prefer an issue first for new features or larger refactors; bug reports can use the existing template.
-- Keep pull requests focused and scoped so they are easy to review.
+## Ways to Contribute
 
-## Getting set up
-1. Install a recent stable Rust toolchain (`rustup` recommended).
-2. Install platform dependencies listed in the [Development](README.md#development) section:
+### 🐛 Report Bugs
+Found something broken? [Open an issue](https://github.com/LargeModGames/spotatui/issues/new) with:
+- What you expected vs what happened
+- Steps to reproduce
+- Your OS and spotatui version
+
+### 💡 Suggest Features
+Have an idea? Start a [Discussion](https://github.com/LargeModGames/spotatui/discussions) or open an issue. We love hearing what would make spotatui better for you.
+
+### 📖 Improve Documentation
+- Fix typos or unclear instructions
+- Add examples or clarify setup steps
+- Translate docs (we'd love to support more languages!)
+
+The wiki is included as a submodule in `spotatui.wiki/`. To contribute:
+```bash
+git clone --recurse-submodules https://github.com/LargeModGames/spotatui.git
+# Make your changes in spotatui.wiki/
+# Then commit and open a PR
+```
+
+### 🎨 Create Themes
+Love customization? Add a new theme preset! Check out `src/user_config/theme.rs` for examples.
+
+### 🧪 Test on Your Setup
+- Try pre-releases and report issues
+- Test on unusual setups (BSD, WSL, specific distros)
+- Verify audio works with different backends
+
+### ⭐ Spread the Word
+- Star the repo
+- Share spotatui with music lovers
+- Write about your experience
+
+---
+
+## Code Contributions
+
+### Ground Rules
+- Be kind and follow our [Code of Conduct](CODE_OF_CONDUCT.md)
+- Open an issue first for new features or larger refactors
+- Keep PRs focused and scoped for easier review
+
+### Getting Set Up
+
+1. Install a recent stable Rust toolchain (`rustup` recommended)
+2. Install platform dependencies from [Development](README.md#development):
    - OpenSSL
-   - `xorg-dev` (Linux; needed for clipboard support)
-   - PipeWire dev libraries on Linux if you plan to use audio visualization
-   - `portaudio` via Homebrew on macOS
-3. Clone your fork and create a topic branch from `master`.
+   - `xorg-dev` (Linux; clipboard support)
+   - PipeWire dev libraries (Linux; audio visualization)
+   - `portaudio` via Homebrew (macOS)
+3. Clone your fork and create a topic branch from `main`
 
-You can run the app locally with the default feature set:
+Run locally:
 ```bash
 cargo run
 ```
-If you prefer to avoid optional audio/streaming dependencies, use the slimmer feature set we use in CI:
+
+Slim build (no audio/streaming):
 ```bash
 cargo run --no-default-features --features telemetry
 ```
 
-## Checks to run before opening a PR
-Run the same commands CI uses so reviewers can focus on the change itself:
+### Before Opening a PR
+
+Run these checks (same as CI):
 ```bash
 cargo fmt --all
 cargo clippy --no-default-features --features telemetry -- -D warnings
 cargo test --no-default-features --features telemetry
 ```
-If you have the required system dependencies installed and want to cover everything, you can also run with `--all-features`.
 
-## Pull request tips
-- Add or adjust tests when you change behavior.
-- Update `README.md` and/or `CHANGELOG.md` when user-facing behavior shifts.
-- Include a brief description of the problem and solution in the PR body, along with any screenshots for UI changes.
-- Keep commits logical; squashing is welcome but not required.
+### PR Tips
+- Add/adjust tests when changing behavior
+- Update `README.md` and `CHANGELOG.md` for user-facing changes
+- Include screenshots for UI changes
+- Keep commits logical; squashing welcome but not required
 
-## Releases
-Release steps for maintainers live in `how_to_release.md`. Contributors do not need to publish artifacts.
+---
+
+## Recognition
+
+We use [all-contributors](https://allcontributors.org/) to recognize everyone who helps—code or not! After your contribution is merged, the maintainer will add you to the contributors list.
+
+## Questions?
+
+Start a [Discussion](https://github.com/LargeModGames/spotatui/discussions) or ping us in an issue. We're happy to help!

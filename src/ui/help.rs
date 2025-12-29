@@ -143,7 +143,7 @@ pub fn get_help_docs(key_bindings: &KeyBindings) -> Vec<Vec<String>> {
       String::from("General"),
     ],
     vec![
-      String::from("Go to playbar only screen (basic view)"),
+      String::from("Go to lyrics view"),
       key_bindings.basic_view.to_string(),
       String::from("General"),
     ],

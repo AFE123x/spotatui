@@ -2,24 +2,33 @@
 
 > A Spotify client for the terminal written in Rust, powered by [Ratatui](https://github.com/ratatui-org/ratatui).
 >
-> **Note:** This is a fork of the original [spotify-tui](https://github.com/Rigellute/spotify-tui) by Rigellute, which is no longer maintained. This fork aims to keep the project alive with updated dependencies and fixes.
+> A community-maintained fork of [spotify-tui](https://github.com/Rigellute/spotify-tui), actively developed with new features like native streaming, synced lyrics, and real-time audio visualization.
+
 
 
 [![Crates.io](https://img.shields.io/crates/v/spotatui.svg)](https://crates.io/crates/spotatui)
 [![Upstream](https://img.shields.io/badge/upstream-Rigellute%2Fspotify--tui-blue)](https://github.com/Rigellute/spotify-tui)
 [![Songs played using Spotatui](https://img.shields.io/badge/dynamic/json?url=https://spotatui-counter.spotatui.workers.dev&query=count&label=Songs%20played%20using%20spotatui&labelColor=0b0f14&color=1ed760&logo=spotify&logoColor=1ed760&style=flat-square&cacheSeconds=600)](https://github.com/LargeModGames/spotatui)
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-95-orange.svg?style=flat-square)](#contributors-)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
+[![spotatui Contributors](https://img.shields.io/badge/spotatui_contributors-6-1ed760.svg?style=flat-square)](#spotatui-contributors)
+[![Upstream Contributors](https://img.shields.io/badge/upstream_contributors-94-orange.svg?style=flat-square)](#upstream-contributors-spotify-tui)
 
-
-A Spotify client for the terminal written in Rust.
 
 ![Demo](.github/demo.gif)
 
 ### Song History
 
 ![Song History](https://spotatui-counter.spotatui.workers.dev/chart.svg)
+
+### 🙏 Help Wanted
+
+**spotatui is currently maintained by a solo developer.** More contributors would be hugely appreciated! Here's how you can help:
+
+- ⭐ **Star the repo** to help others discover the project
+- 🐛 **Report bugs** or request features in [Issues](https://github.com/LargeModGames/spotatui/issues)
+- 💬 **Join the community** in [Discussions](https://github.com/LargeModGames/spotatui/discussions)
+- 📖 **Submit a PR** for code, docs, or themes
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more details!
 
 ### ⚡ Performance
 
@@ -44,45 +53,6 @@ spotatui is extremely lightweight compared to the official Electron client.
 
 We respect your privacy. This is purely a fun community metric with zero tracking of individual users.
 
----
-
-- [spotatui](#spotatui)
-    - [⚡ Performance](#-performance)
-  - [Privacy Notice](#privacy-notice)
-  - [Migrating from spotify-tui](#migrating-from-spotify-tui)
-  - [Installation](#installation)
-    - [Pre-built Binaries](#pre-built-binaries)
-      - [Linux Requirements](#linux-requirements)
-      - [macOS Requirements](#macos-requirements)
-    - [Arch Linux (AUR)](#arch-linux-aur)
-    - [Cargo](#cargo)
-    - [Building from Source](#building-from-source)
-    - [Updating](#updating)
-  - [Connecting to Spotify's API](#connecting-to-spotifys-api)
-  - [Usage](#usage)
-  - [Native Streaming (Experimental)](#native-streaming-experimental)
-    - [Setup](#setup)
-    - [How It Works](#how-it-works)
-    - [Notes](#notes)
-    - [MPRIS D-Bus Integration (Linux)](#mpris-d-bus-integration-linux)
-    - [macOS Now Playing Integration](#macos-now-playing-integration)
-- [Configuration](#configuration)
-  - [In-App Settings](#in-app-settings)
-    - [Settings Categories](#settings-categories)
-    - [Theme Presets](#theme-presets)
-    - [Controls](#controls)
-  - [Limitations](#limitations)
-    - [Deprecated Spotify API Features](#deprecated-spotify-api-features)
-  - [Using with spotifyd](#using-with-spotifyd)
-  - [Libraries used](#libraries-used)
-  - [Development](#development)
-    - [Windows Subsystem for Linux](#windows-subsystem-for-linux)
-  - [Maintainer](#maintainer)
-  - [Contributors](#contributors)
-  - [Star History](#star-history)
-  - [Roadmap](#roadmap)
-    - [High-level requirements yet to be implemented](#high-level-requirements-yet-to-be-implemented)
-
 ## Migrating from spotify-tui
 
 If you used the original `spotify-tui` before:
@@ -103,166 +73,25 @@ You may be asked to re-authenticate with Spotify the first time.
 
 ## Installation
 
-### Pre-built Binaries
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/LargeModGames/spotatui/releases/latest):
-
-| Platform                           | File                            |
-| ---------------------------------- | ------------------------------- |
-| Windows 10/11 (64-bit)             | `spotatui-windows-x86_64.zip`   |
-| Linux (Ubuntu, Arch, Fedora, etc.) | `spotatui-linux-x86_64.tar.gz`  |
-| macOS (Intel)                      | `spotatui-macos-x86_64.tar.gz`  |
-| macOS (Apple Silicon M1/M2/M3)     | `spotatui-macos-aarch64.tar.gz` |
-
-Checksums (`.sha256`) are provided if you want to verify the download.
-
-#### Linux Requirements
-
-For audio visualization on Linux, you need PipeWire installed:
-
 ```bash
-# Debian/Ubuntu
-sudo apt-get install libpipewire-0.3-0
-
-# Arch Linux (already included with pipewire)
-sudo pacman -S pipewirelibssl-dev pkg-config
-
-# Fedora (already included with pipewire)
-sudo dnf install pipewire
-```
-
-> **Note:** Most modern Linux distributions already have PipeWire installed by default.
-
-#### macOS Requirements
-
-For macOS, `spotatui` uses the `portaudio` backend for better stability and bluetooth device support (such as AirPods).
-
-`portaudio` needs to be installed first, via homebrew:
-
-```bash
-brew install portaudio
-```
-
-### Arch Linux (AUR)
-
-For Arch Linux users, spotatui is available in the AUR:
-
-```bash
-yay -S spotatui
-# or
-paru -S spotatui
-```
-
-### Cargo
-
-If you have Rust installed:
-
-```bash
+# Cargo (recommended)
 cargo install spotatui
+
+# Arch Linux (AUR)
+yay -S spotatui
 ```
 
-> **Note (Linux/WSL):** If you get a `linker 'cc' not found` error, install build tools first:
-> ```bash
-> sudo apt install libssl-dev pkg-config
-> ```
+Or download pre-built binaries from [GitHub Releases](https://github.com/LargeModGames/spotatui/releases/latest).
 
-### Building from Source
+📖 **See the [Installation Wiki](https://github.com/LargeModGames/spotatui/wiki/Installation) for platform-specific requirements and building from source.**
 
-Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed.
+## Connecting to Spotify
 
-**macOS Prerequisites:**
+Run `spotatui` and follow the on-screen instructions to connect your Spotify account.
 
-```bash
-brew install portaudio
-```
+You'll need to create a Spotify Developer app at the [Spotify Dashboard](https://developer.spotify.com/dashboard/applications).
 
-**Linux Prerequisites:**
-
-```bash
-# Debian/Ubuntu
-sudo apt-get install libssl-dev libasound2-dev pkg-config
-
-# Arch Linux
-sudo pacman -S openssl alsa-lib pkg-config
-
-# Fedora
-sudo dnf install openssl-devel alsa-lib-devel pkg-config
-```
-
-**Building:**
-
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/LargeModGames/spotatui.git
-    cd spotatui
-    ```
-
-2.  Build and install:
-
-    **macOS:**
-    ```bash
-    cargo install --path . --no-default-features --features telemetry,streaming,portaudio-backend,audio-viz-cpal
-    ```
-
-    **Linux/Windows:**
-    ```bash
-    cargo install --path .
-    ```
-
-    Or build and run directly:
-    ```bash
-    cargo run --release
-    ```
-
-    **Nix:**
-    ```bash
-    nix-build
-    ```
-
-### Updating
-
-When a new version of spotatui is available, you'll see a popup notification on startup. To update:
-
-1. Close spotatui
-2. Run the following command:
-   ```bash
-   spotatui update --install
-   ```
-
-This will download and install the latest version automatically.
-If you install spotatui through your package manager, it is suggested to update through there instead of the command above.
-
-## Connecting to Spotify's API
-
-`spotatui` needs to connect to Spotify’s API in order to find music by
-name, play tracks etc.
-
-Instructions on how to set this up will be shown when you first run the app.
-
-But here they are again:
-
-1. Go to the [Spotify dashboard](https://developer.spotify.com/dashboard/applications)
-1. Click `Create an app`
-    - You now can see your `Client ID` and `Client Secret`
-1. Now click `Edit Settings`
-1. Add the following Redirect URIs (use `127.0.0.1` instead of `localhost` as Spotify no longer allows `localhost`):
-    - `http://127.0.0.1:8888/callback` (for API authentication)
-    - `http://127.0.0.1:8989/login` (for native streaming - see [Native Streaming](#native-streaming-experimental))
-1. Scroll down and click `Save`
-1. You are now ready to authenticate with Spotify!
-1. Go back to the terminal
-1. Run `spotatui`
-1. Enter your `Client ID`
-1. Enter your `Client Secret`
-1. Press enter to confirm the default port (8888) or enter a custom port
-1. You will be redirected to an official Spotify webpage to ask you for permissions.
-1. After accepting the permissions, you'll be redirected to localhost. If all goes well, the redirect URL will be parsed automatically and now you're done. If the local webserver fails for some reason you'll be redirected to a blank webpage that might say something like "Connection Refused" since no server is running. Regardless, copy the URL and paste into the prompt in the terminal.
-
-> **💡 Tip:** If the authentication doesn't work after pasting the URL, try changing `127.0.0.1` to `localhost` in the copied URL before pasting it into the terminal. Some systems may have issues with one format or the other.
-
-And now you are ready to use `spotatui` 🎉
-
-You can edit the config at anytime at `${HOME}/.config/spotatui/client.yml`.
+📖 **See the [Installation Wiki](https://github.com/LargeModGames/spotatui/wiki/Installation#connecting-to-spotify) for step-by-step setup.**
 
 ## Usage
 
@@ -270,6 +99,8 @@ The binary is named `spotatui`.
 
 Running `spotatui` with no arguments will bring up the UI. Press `?` to bring up a help menu that shows currently implemented key events and their actions.
 There is also a CLI that is able to do most of the stuff the UI does. Use `spotatui --help` to learn more.
+
+📖 **See [Keybindings Wiki](https://github.com/LargeModGames/spotatui/wiki/Keybindings) for the full list of keyboard shortcuts.**
 
 Here are some example to get you excited.
 ```
@@ -287,196 +118,30 @@ spotatui list --liked --limit 50 # See your liked songs (50 is the max limit)
 spotatui search "An even cooler song" --tracks --format "%t from %b" --limit 30
 ```
 
-## Native Streaming (Experimental)
+## Native Streaming
 
-spotatui now includes **native Spotify Connect** support, allowing it to play audio directly on your computer without needing an external player like spotifyd.
+spotatui can play audio directly without needing spotifyd or the official Spotify app. Just run `spotatui` and it will appear as a Spotify Connect device.
 
-### Setup
+- Works with media keys, MPRIS (Linux), and macOS Now Playing
+- Premium account required
 
-The native streaming feature uses a separate authentication flow. On first run:
-
-1. Your browser will open to Spotify's authorization page
-2. **Important:** The redirect URI will be `http://127.0.0.1:8989/login` - this is different from the main app's callback URL
-3. After authorizing, "spotatui" will appear in your Spotify Connect device list
-4. Credentials are cached so you only need to do this once
-
-### How It Works
-
-- When streaming is enabled, "spotatui" registers as a Spotify Connect device
-- You can control playback from the TUI, your phone, or any other Spotify client
-- Audio plays directly on the computer running spotatui
-
-### Notes
-
-- Native streaming is **enabled by default** when built with the `streaming` feature
-- Premium account is required for playback
-- The streaming authentication uses a different client than the main app's API controls
-
-### MPRIS D-Bus Integration (Linux)
-
-When using native streaming on Linux, spotatui automatically registers with the [MPRIS D-Bus interface](https://specifications.freedesktop.org/mpris-spec/latest/), enabling:
-
-- **Media key support** - Play/pause, next, previous via keyboard media keys
-- **Desktop integration** - Track info appears in GNOME/KDE media widgets
-- **playerctl compatibility** - Control spotatui from the command line:
-
-```bash
-# Check available players
-playerctl -l
-# Should show: spotatui
-
-# Control playback
-playerctl -p spotatui play-pause
-playerctl -p spotatui next
-playerctl -p spotatui previous
-
-# View current track metadata
-playerctl -p spotatui metadata
-```
-
-MPRIS is enabled by default on Linux builds with native streaming.
-
-### macOS Now Playing Integration
-
-When using native streaming on macOS, spotatui registers with the system's [Now Playing](https://developer.apple.com/documentation/mediaplayer/mpnowplayinginfocenter) interface, enabling:
-
-- **Media key support** - Play/pause, next, previous via keyboard media keys
-- **Control Center integration** - Control playback from macOS Control Center
-- **Touch Bar support** - Media controls on MacBook Pro Touch Bar
-- **AirPods / Headphone controls** - Play/pause and skip via Bluetooth headphone buttons
-
-This feature uses Apple's `MPRemoteCommandCenter` API and is enabled by default on macOS builds with native streaming.
+📖 **See the [Native Streaming Wiki](https://github.com/LargeModGames/spotatui/wiki/Native-Streaming) for setup details.**
 
 # Configuration
 
 A configuration file is located at `${HOME}/.config/spotatui/config.yml`.
-(not to be confused with client.yml which handles spotify authentication)
 
-The following is a sample config.yml file:
+📖 **See the [Configuration Wiki](https://github.com/LargeModGames/spotatui/wiki/Configuration) for the full config file reference.**
 
-```yaml
-# Sample config file
+You can also configure spotatui in-app by pressing `Alt-,` to open Settings.
 
-# The theme colours can be an rgb string of the form "255, 255, 255" or a string that references the colours from your terminal theme: Reset, Black, Red, Green, Yellow, Blue, Magenta, Cyan, Gray, DarkGray, LightRed, LightGreen, LightYellow, LightBlue, LightMagenta, LightCyan, White.
-theme:
-  active: Cyan # current playing song in list
-  banner: LightCyan # the "spotatui" banner on launch
-  error_border: Red # error dialog border
-  error_text: LightRed # error message text (e.g. "Spotify API reported error 404")
-  hint: Yellow # hint text in errors
-  hovered: Magenta # hovered pane border
-  inactive: Gray # borders of inactive panes
-  playbar_background: Black # background of progress bar
-  playbar_progress: LightCyan # filled-in part of the progress bar
-  playbar_progress_text: Cyan # song length and time played/left indicator in the progress bar
-  playbar_text: White # artist name in player pane
-  selected: LightCyan # a) selected pane border, b) hovered item in list, & c) track title in player
-  text: "255, 255, 255" # text in panes
-  header: White # header text in panes (e.g. 'Title', 'Artist', etc.)
-
-behavior:
-  seek_milliseconds: 5000
-  volume_increment: 10
-  # The lower the number the higher the "frames per second". You can decrease this number so that the audio visualisation is smoother but this can be expensive!
-  tick_rate_milliseconds: 250
-  # Enable text emphasis (typically italic/bold text styling). Disabling this might be important if the terminal config is otherwise restricted and rendering text escapes interferes with the UI.
-  enable_text_emphasis: true
-  # Controls whether to show a loading indicator in the top right of the UI whenever communicating with Spotify API
-  show_loading_indicator: true
-  # Disables the responsive layout that makes the search bar smaller on bigger
-  # screens and enforces a wide search bar
-  enforce_wide_search_bar: false
-  # Contribute to the global song counter (completely anonymous, no PII collected)
-  # Set to false to opt out of contributing to the global counter
-  enable_global_song_count: true
-  # Determines the text icon to display next to "liked" Spotify items, such as
-  # liked songs and albums, or followed artists. Can be any length string.
-  # These icons require a patched nerd font.
-  liked_icon: ♥
-  shuffle_icon: 🔀
-  repeat_track_icon: 🔂
-  repeat_context_icon: 🔁
-  playing_icon: ▶
-  paused_icon: ⏸
-  # Sets the window title to "spotatui - Spotify TUI" via ANSI escape code.
-  set_window_title: true
-
-keybindings:
-  # Key stroke can be used if it only uses two keys:
-  # ctrl-q works,
-  # ctrl-alt-q doesn't.
-  back: "ctrl-q"
-
-  jump_to_album: "a"
-
-  # Shift modifiers use a capital letter (also applies with other modifier keys
-  # like ctrl-A)
-  jump_to_artist_album: "A"
-
-  manage_devices: "d"
-  decrease_volume: "-"
-  increase_volume: "+"
-  toggle_playback: " "
-  seek_backwards: "<"
-  seek_forwards: ">"
-  next_track: "n"
-  previous_track: "p"
-  copy_song_url: "c"
-  copy_album_url: "C"
-  help: "?"
-  shuffle: "ctrl-s"
-  repeat: "r"
-  search: "/"
-  audio_analysis: "v"
-  jump_to_context: "o"
-  basic_view: "B"
-  add_item_to_queue: "z"
-```
-
-## In-App Settings
-
-Press `Alt-,` to open the **Settings** screen, where you can customize spotatui without editing config files manually.
-
-### Settings Categories
-
-| Category        | Description                                                |
-| --------------- | ---------------------------------------------------------- |
-| **Behavior**    | Seek duration, volume increment, tick rate, icons, toggles |
-| **Keybindings** | View current keybindings (customization coming soon)       |
-| **Theme**       | Color presets and individual color customization           |
-
-### Theme Presets
-
-Choose from 7 built-in theme presets:
-
-| Preset         | Description                       |
-| -------------- | --------------------------------- |
-| Default (Cyan) | Original spotatui theme           |
-| Spotify        | Official Spotify green (#1DB954)  |
-| Dracula        | Popular dark purple/pink theme    |
-| Nord           | Arctic, bluish color palette      |
-| Solarized Dark | Classic dark theme                |
-| Monokai        | Vibrant colors on dark background |
-| Gruvbox        | Warm retro groove colors          |
-
-### Controls
-
-| Key       | Action                                     |
-| --------- | ------------------------------------------ |
-| `Alt-,`   | Open Settings                              |
-| `←` / `→` | Switch category tabs                       |
-| `↑` / `↓` | Navigate settings                          |
-| `Enter`   | Toggle boolean / Cycle preset / Edit value |
-| `Alt-S`   | Save changes                               |
-| `Esc`     | Exit Settings                              |
-
-Changes are applied **immediately** when saved - no restart required!
+📖 **See [Themes Wiki](https://github.com/LargeModGames/spotatui/wiki/Themes) for built-in presets (Spotify, Dracula, Nord, etc.).**
 
 ## Limitations
 
 This app uses the [Web API](https://developer.spotify.com/documentation/web-api/) from Spotify, which doesn't handle streaming itself. You have three options for audio playback:
 
-1. **Native Streaming (NEW!)** - spotatui can now play audio directly using its built-in streaming feature. See [Native Streaming](#native-streaming-experimental) below.
+1. **Native Streaming (NEW!)** - spotatui can now play audio directly using its built-in streaming feature. See [Native Streaming](#native-streaming) below.
 2. **Official Spotify Client** - Have the official Spotify app open on your computer
 3. **Spotifyd** - Use a lightweight alternative like [spotifyd](https://github.com/Spotifyd/spotifyd)
 
@@ -516,8 +181,12 @@ After that there is not much to it.
 
 ## Libraries used
 
-- [ratatui](https://github.com/ratatui-org/ratatui)
-- [rspotify](https://github.com/ramsayleung/rspotify)
+- [ratatui](https://github.com/ratatui-org/ratatui) - Terminal UI framework
+- [rspotify](https://github.com/ramsayleung/rspotify) - Spotify Web API client
+- [librespot](https://github.com/librespot-org/librespot) - Spotify Connect streaming
+- [tokio](https://github.com/tokio-rs/tokio) - Async runtime
+- [crossterm](https://github.com/crossterm-rs/crossterm) - Terminal manipulation
+- [clap](https://github.com/clap-rs/clap) - CLI argument parsing
 
 ## Development
 
@@ -551,19 +220,36 @@ sudo apt-get install -y -qq pkg-config libssl-dev libxcb1-dev libxcb-render0-dev
 
 Maintained by **[LargeModGames](https://github.com/LargeModGames)**.
 
-Original author: [Alexander Keliris](https://github.com/Rigellute).
+Originally forked from [spotify-tui](https://github.com/Rigellute/spotify-tui) by [Alexander Keliris](https://github.com/Rigellute).
 
-## Contributors
+## spotatui Contributors
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+**Looking for contributors!** spotatui is actively maintained but could use your help. Whether it's bug fixes, new features, documentation, or testing - all contributions are welcome!
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LargeModGames"><img src="https://avatars.githubusercontent.com/u/84450916?v=4?s=100" width="100px;" alt="LargeModGames"/><br /><sub><b>LargeModGames</b></sub></a><br /><a href="https://github.com/Rigellute/spotify-tui/commits?author=LargeModGames" title="Code">💻</a> <a href="https://github.com/Rigellute/spotify-tui/commits?author=LargeModGames" title="Documentation">📖</a> <a href="https://github.com/Rigellute/spotify-tui/commits?author=LargeModGames" title="Tests">⚠️</a> <a href="#ideas-LargeModGames" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-LargeModGames" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-LargeModGames" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LargeModGames"><img src="https://avatars.githubusercontent.com/u/84450916?v=4?s=100" width="100px;" alt="LargeModGames"/><br /><sub><b>LargeModGames</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=LargeModGames" title="Code">💻</a> <a href="https://github.com/LargeModGames/spotatui/commits?author=LargeModGames" title="Documentation">📖</a> <a href="#maintenance-LargeModGames" title="Maintenance">🚧</a> <a href="#ideas-LargeModGames" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-LargeModGames" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="https://github.com/LargeModGames/spotatui/commits?author=LargeModGames" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/MysteriousWolf"><img src="https://avatars.githubusercontent.com/u/5306409?v=4?s=100" width="100px;" alt="MysteriousWolf"/><br /><sub><b>MysteriousWolf</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=MysteriousWolf" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/rawcode1337"><img src="https://avatars.githubusercontent.com/u/80097670?v=4?s=100" width="100px;" alt="rawcode1337"/><br /><sub><b>rawcode1337</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=rawcode1337" title="Code">💻</a> <a href="https://github.com/LargeModGames/spotatui/issues?q=author%3Arawcode1337" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/copeison"><img src="https://avatars.githubusercontent.com/u/184175589?v=4?s=100" width="100px;" alt="copeison"/><br /><sub><b>copeison</b></sub></a><br /><a href="#platform-copeison" title="Packaging/porting to new platform">📦</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/jacklorusso"><img src="https://avatars.githubusercontent.com/u/19835679?v=4?s=100" width="100px;" alt="jacklorusso"/><br /><sub><b>jacklorusso</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=jacklorusso" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/H41L33"><img src="https://avatars.githubusercontent.com/u/140116782?v=4?s=100" width="100px;" alt="H41L33"/><br /><sub><b>H41L33</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=H41L33" title="Documentation">📖</a></td>
+    </tr>
+  </tbody>
+</table>
+
+*Want to see your name here? Check out our [open issues](https://github.com/LargeModGames/spotatui/issues) or the [Roadmap](#roadmap) below!*
+
+---
+
+## Upstream Contributors (spotify-tui)
+
+Thanks to all the contributors who built the original [spotify-tui](https://github.com/Rigellute/spotify-tui) that this project is forked from ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<table>
+  <tbody>
+    <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://keliris.dev/"><img src="https://avatars2.githubusercontent.com/u/12150276?v=4?s=100" width="100px;" alt="Alexander Keliris"/><br /><sub><b>Alexander Keliris</b></sub></a><br /><a href="https://github.com/Rigellute/spotify-tui/commits?author=Rigellute" title="Code">💻</a> <a href="https://github.com/Rigellute/spotify-tui/commits?author=Rigellute" title="Documentation">📖</a> <a href="#design-Rigellute" title="Design">🎨</a> <a href="#blog-Rigellute" title="Blogposts">📝</a> <a href="#ideas-Rigellute" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-Rigellute" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#platform-Rigellute" title="Packaging/porting to new platform">📦</a> <a href="https://github.com/Rigellute/spotify-tui/pulls?q=is%3Apr+reviewed-by%3ARigellute" title="Reviewed Pull Requests">👀</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/mikepombal"><img src="https://avatars3.githubusercontent.com/u/6864231?v=4?s=100" width="100px;" alt="Mickael Marques"/><br /><sub><b>Mickael Marques</b></sub></a><br /><a href="#financial-mikepombal" title="Financial">💵</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/HakierGrzonzo"><img src="https://avatars0.githubusercontent.com/u/36668331?v=4?s=100" width="100px;" alt="Grzegorz Koperwas"/><br /><sub><b>Grzegorz Koperwas</b></sub></a><br /><a href="https://github.com/Rigellute/spotify-tui/commits?author=HakierGrzonzo" title="Documentation">📖</a></td>
@@ -703,79 +389,8 @@ This project follows the [all-contributors](https://github.com/all-contributors/
 
 The goal is to eventually implement almost every Spotify feature.
 
-### High-level requirements yet to be implemented
-
+**High-priority features:**
 - Add songs to a playlist
-- Be able to scroll through result pages in every view
+- Scroll through result pages in every view
 
-This table shows all that is possible with the Spotify API, what is implemented already, and whether that is essential.
-
-| API method                                        | Implemented yet? | Explanation                                                                                                                                                  | Essential? |
-| ------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
-| track                                             | No               | returns a single track given the track's ID, URI or URL                                                                                                      | No         |
-| tracks                                            | No               | returns a list of tracks given a list of track IDs, URIs, or URLs                                                                                            | No         |
-| artist                                            | No               | returns a single artist given the artist's ID, URI or URL                                                                                                    | Yes        |
-| artists                                           | No               | returns a list of artists given the artist IDs, URIs, or URLs                                                                                                | No         |
-| artist_albums                                     | Yes              | Get Spotify catalog information about an artist's albums                                                                                                     | Yes        |
-| artist_top_tracks                                 | Yes              | Get Spotify catalog information about an artist's top 10 tracks by country.                                                                                  | Yes        |
-| artist_related_artists                            | Yes              | Get Spotify catalog information about artists similar to an identified artist. Similarity is based on analysis of the Spotify community's listening history. | Yes        |
-| album                                             | Yes              | returns a single album given the album's ID, URIs or URL                                                                                                     | Yes        |
-| albums                                            | No               | returns a list of albums given the album IDs, URIs, or URLs                                                                                                  | No         |
-| search_album                                      | Yes              | Search album based on query                                                                                                                                  | Yes        |
-| search_artist                                     | Yes              | Search artist based on query                                                                                                                                 | Yes        |
-| search_track                                      | Yes              | Search track based on query                                                                                                                                  | Yes        |
-| search_playlist                                   | Yes              | Search playlist based on query                                                                                                                               | Yes        |
-| album_track                                       | Yes              | Get Spotify catalog information about an album's tracks                                                                                                      | Yes        |
-| user                                              | No               | Gets basic profile information about a Spotify User                                                                                                          | No         |
-| playlist                                          | Yes              | Get full details about Spotify playlist                                                                                                                      | Yes        |
-| current_user_playlists                            | Yes              | Get current user playlists without required getting his profile                                                                                              | Yes        |
-| user_playlists                                    | No               | Gets playlists of a user                                                                                                                                     | No         |
-| user_playlist                                     | No               | Gets playlist of a user                                                                                                                                      | No         |
-| user_playlist_tracks                              | Yes              | Get full details of the tracks of a playlist owned by a user                                                                                                 | Yes        |
-| user_playlist_create                              | No               | Creates a playlist for a user                                                                                                                                | Yes        |
-| user_playlist_change_detail                       | No               | Changes a playlist's name and/or public/private state                                                                                                        | Yes        |
-| user_playlist_unfollow                            | Yes              | Unfollows (deletes) a playlist for a user                                                                                                                    | Yes        |
-| user_playlist_add_track                           | No               | Adds tracks to a playlist                                                                                                                                    | Yes        |
-| user_playlist_replace_track                       | No               | Replace all tracks in a playlist                                                                                                                             | No         |
-| user_playlist_recorder_tracks                     | No               | Reorder tracks in a playlist                                                                                                                                 | No         |
-| user_playlist_remove_all_occurrences_of_track     | No               | Removes all occurrences of the given tracks from the given playlist                                                                                          | No         |
-| user_playlist_remove_specific_occurrenes_of_track | No               | Removes all occurrences of the given tracks from the given playlist                                                                                          | No         |
-| user_playlist_follow_playlist                     | Yes              | Add the current authenticated user as a follower of a playlist.                                                                                              | Yes        |
-| user_playlist_check_follow                        | No               | Check to see if the given users are following the given playlist                                                                                             | Yes        |
-| me                                                | No               | Get detailed profile information about the current user.                                                                                                     | Yes        |
-| current_user                                      | No               | Alias for `me`                                                                                                                                               | Yes        |
-| current_user_playing_track                        | Yes              | Get information about the current users currently playing track.                                                                                             | Yes        |
-| current_user_saved_albums                         | Yes              | Gets a list of the albums saved in the current authorized user's "Your Music" library                                                                        | Yes        |
-| current_user_saved_tracks                         | Yes              | Gets the user's saved tracks or "Liked Songs"                                                                                                                | Yes        |
-| current_user_followed_artists                     | Yes              | Gets a list of the artists followed by the current authorized user                                                                                           | Yes        |
-| current_user_saved_tracks_delete                  | Yes              | Remove one or more tracks from the current user's "Your Music" library.                                                                                      | Yes        |
-| current_user_saved_tracks_contain                 | No               | Check if one or more tracks is already saved in the current Spotify user’s “Your Music” library.                                                             | Yes        |
-| current_user_saved_tracks_add                     | Yes              | Save one or more tracks to the current user's "Your Music" library.                                                                                          | Yes        |
-| current_user_top_artists                          | No               | Get the current user's top artists                                                                                                                           | Yes        |
-| current_user_top_tracks                           | No               | Get the current user's top tracks                                                                                                                            | Yes        |
-| current_user_recently_played                      | Yes              | Get the current user's recently played tracks                                                                                                                | Yes        |
-| current_user_saved_albums_add                     | Yes              | Add one or more albums to the current user's "Your Music" library.                                                                                           | Yes        |
-| current_user_saved_albums_delete                  | Yes              | Remove one or more albums from the current user's "Your Music" library.                                                                                      | Yes        |
-| user_follow_artists                               | Yes              | Follow one or more artists                                                                                                                                   | Yes        |
-| user_unfollow_artists                             | Yes              | Unfollow one or more artists                                                                                                                                 | Yes        |
-| user_follow_users                                 | No               | Follow one or more users                                                                                                                                     | No         |
-| user_unfollow_users                               | No               | Unfollow one or more users                                                                                                                                   | No         |
-| featured_playlists                                | No               | Get a list of Spotify featured playlists                                                                                                                     | Yes        |
-| new_releases                                      | No               | Get a list of new album releases featured in Spotify                                                                                                         | Yes        |
-| categories                                        | No               | Get a list of categories used to tag items in Spotify                                                                                                        | Yes        |
-| recommendations                                   | Yes              | Get Recommendations Based on Seeds                                                                                                                           | Yes        |
-| audio_features                                    | No               | Get audio features for a track                                                                                                                               | No         |
-| audios_features                                   | No               | Get Audio Features for Several Tracks                                                                                                                        | No         |
-| audio_analysis                                    | Yes              | Get Audio Analysis for a Track                                                                                                                               | Yes        |
-| device                                            | Yes              | Get a User’s Available Devices                                                                                                                               | Yes        |
-| current_playback                                  | Yes              | Get Information About The User’s Current Playback                                                                                                            | Yes        |
-| current_playing                                   | No               | Get the User’s Currently Playing Track                                                                                                                       | No         |
-| transfer_playback                                 | Yes              | Transfer a User’s Playback                                                                                                                                   | Yes        |
-| start_playback                                    | Yes              | Start/Resume a User’s Playback                                                                                                                               | Yes        |
-| pause_playback                                    | Yes              | Pause a User’s Playback                                                                                                                                      | Yes        |
-| next_track                                        | Yes              | Skip User’s Playback To Next Track                                                                                                                           | Yes        |
-| previous_track                                    | Yes              | Skip User’s Playback To Previous Track                                                                                                                       | Yes        |
-| seek_track                                        | Yes              | Seek To Position In Currently Playing Track                                                                                                                  | Yes        |
-| repeat                                            | Yes              | Set Repeat Mode On User’s Playback                                                                                                                           | Yes        |
-| volume                                            | Yes              | Set Volume For User’s Playback                                                                                                                               | Yes        |
-| shuffle                                           | Yes              | Toggle Shuffle For User’s Playback                                                                                                                           | Yes        |
+📖 **See the [Roadmap Wiki](https://github.com/LargeModGames/spotatui/wiki/Roadmap) for the full API coverage table.**
