@@ -3,7 +3,7 @@ use crate::app::App;
 use crate::user_config::VisualizerStyle;
 use ratatui::{
   buffer::Buffer,
-  layout::{Constraint, Direction, Layout, Rect},
+  layout::{Constraint, Layout, Rect},
   style::Style,
   text::{Line, Span},
   widgets::{Block, Borders, Paragraph, Widget},
@@ -16,11 +16,9 @@ use tui_equalizer::{Band, Equalizer};
 pub fn draw(f: &mut Frame<'_>, app: &App) {
   let margin = util::get_main_layout_margin(app);
 
-  let chunks = Layout::default()
-    .direction(Direction::Vertical)
-    .constraints([Constraint::Length(3), Constraint::Min(10)].as_ref())
-    .margin(margin)
-    .split(f.area());
+  let [info_area, visualizer_area] = f
+    .area()
+    .layout(&Layout::vertical([Constraint::Length(3), Constraint::Min(10)]).margin(margin));
 
   let white = Style::default().fg(app.user_config.theme.text);
   let gray = Style::default().fg(app.user_config.theme.inactive);
@@ -70,19 +68,19 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     let p = Paragraph::new(texts)
       .block(info_block)
       .style(Style::default().fg(app.user_config.theme.text));
-    f.render_widget(p, chunks[0]);
+    f.render_widget(p, info_area);
 
     // Calculate inner area for visualizer (within the block borders)
-    let inner_area = bar_chart_block.inner(chunks[1]);
+    let inner_area = bar_chart_block.inner(visualizer_area);
 
     // Render the appropriate visualizer based on user setting
     match visualizer_style {
       VisualizerStyle::Equalizer => {
-        f.render_widget(bar_chart_block, chunks[1]);
+        f.render_widget(bar_chart_block, visualizer_area);
         render_equalizer(f, &spectrum.bands, inner_area);
       }
       VisualizerStyle::BarGraph => {
-        f.render_widget(bar_chart_block, chunks[1]);
+        f.render_widget(bar_chart_block, visualizer_area);
         render_bar_graph(f, &spectrum.bands, inner_area);
       }
     }
@@ -104,13 +102,13 @@ pub fn draw(f: &mut Frame<'_>, app: &App) {
     let p = Paragraph::new(no_capture_text)
       .block(info_block)
       .style(Style::default().fg(app.user_config.theme.text));
-    f.render_widget(p, chunks[0]);
+    f.render_widget(p, info_area);
 
     // Empty bar chart
     let empty_p = Paragraph::new("Waiting for audio input...")
       .block(bar_chart_block)
       .style(Style::default().fg(app.user_config.theme.text));
-    f.render_widget(empty_p, chunks[1]);
+    f.render_widget(empty_p, visualizer_area);
   }
 }
 
@@ -144,7 +142,7 @@ fn render_equalizer(f: &mut Frame<'_>, bands: &[f32], area: Rect) {
 
   // Cap height to keep rendering fast on very tall terminals.
   const MAX_EQ_HEIGHT: u16 = 24;
-  let render_height = area.height.min(MAX_EQ_HEIGHT).max(1);
+  let render_height = area.height.clamp(1, MAX_EQ_HEIGHT);
   let base_width = (bands.len() as u16) * 2;
 
   // Render into a small off-screen buffer, then "stretch" each band horizontally by repeating it.

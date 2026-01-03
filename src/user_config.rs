@@ -369,17 +369,6 @@ impl VisualizerStyle {
     let next_idx = (current_idx + 1) % styles.len();
     styles[next_idx]
   }
-
-  pub fn prev(&self) -> Self {
-    let styles = Self::all();
-    let current_idx = styles.iter().position(|s| s == self).unwrap_or(0);
-    let prev_idx = if current_idx == 0 {
-      styles.len() - 1
-    } else {
-      current_idx - 1
-    };
-    styles[prev_idx]
-  }
 }
 
 fn parse_key(key: String) -> Result<Key> {
