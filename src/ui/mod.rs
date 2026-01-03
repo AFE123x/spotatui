@@ -14,7 +14,9 @@ use ratatui::{
   layout::{Alignment, Constraint, Direction, Layout, Rect},
   style::{Color, Modifier, Style},
   text::{Line, Span, Text},
-  widgets::{Block, Borders, Clear, Gauge, List, ListItem, ListState, Paragraph, Row, Table, Wrap},
+  widgets::{
+    Block, Borders, Clear, LineGauge, List, ListItem, ListState, Paragraph, Row, Table, Wrap,
+  },
   Frame,
 };
 use rspotify::model::enums::RepeatState;
@@ -1160,14 +1162,20 @@ pub fn draw_playbar(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
       } else {
         Modifier::empty()
       };
-      let song_progress = Gauge::default()
-        .gauge_style(
+      let song_progress = LineGauge::default()
+        .filled_style(
           Style::default()
             .fg(app.user_config.theme.playbar_progress)
-            .bg(app.user_config.theme.playbar_background)
             .add_modifier(modifier),
         )
-        .percent(perc)
+        .unfilled_style(
+          Style::default()
+            .fg(app.user_config.theme.playbar_background)
+            .add_modifier(modifier),
+        )
+        .ratio(perc as f64 / 100.0)
+        .filled_symbol("⣿")
+        .unfilled_symbol("⣉")
         .label(Span::styled(
           &song_progress_label,
           Style::default().fg(app.user_config.theme.playbar_progress_text),
@@ -1548,7 +1556,7 @@ pub fn draw_device_list(f: &mut Frame<'_>, app: &App) {
         .bg(app.user_config.theme.inactive)
         .add_modifier(Modifier::BOLD),
     )
-    .highlight_symbol(">> ");
+    .highlight_symbol(Line::from("▶ ").style(Style::default().fg(app.user_config.theme.active)));
   f.render_stateful_widget(list, chunks[1], &mut state);
 }
 
@@ -1820,7 +1828,8 @@ pub fn draw_discover(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
     )
     .highlight_style(
       get_color(highlight_state, app.user_config.theme).add_modifier(Modifier::BOLD),
-    );
+    )
+    .highlight_symbol(Line::from("▶ ").style(get_color(highlight_state, app.user_config.theme)));
 
   f.render_stateful_widget(list, chunks[0], &mut state);
 
@@ -1996,7 +2005,8 @@ fn draw_selectable_list<S>(
     .style(app.user_config.theme.base_style())
     .highlight_style(
       get_color(highlight_state, app.user_config.theme).add_modifier(Modifier::BOLD),
-    );
+    )
+    .highlight_symbol(Line::from("▶ ").style(get_color(highlight_state, app.user_config.theme)));
   f.render_stateful_widget(list, layout_chunk, &mut state);
 }
 
@@ -2328,7 +2338,8 @@ fn draw_sort_menu(f: &mut Frame<'_>, app: &App) {
       Style::default()
         .fg(app.user_config.theme.active)
         .add_modifier(Modifier::BOLD),
-    );
+    )
+    .highlight_symbol(Line::from("▶ ").style(Style::default().fg(app.user_config.theme.active)));
 
   let mut state = ListState::default();
   state.select(Some(app.sort_menu_selected));

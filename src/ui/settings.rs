@@ -107,10 +107,7 @@ fn draw_settings_list(f: &mut Frame<'_>, app: &App, area: Rect) {
         Style::default().fg(app.user_config.theme.inactive)
       };
 
-      let indicator = if is_selected { "▶ " } else { "  " };
-
       let line = Line::from(vec![
-        Span::styled(indicator, name_style),
         Span::styled(format!("{}: ", setting.name), name_style),
         Span::styled(value_str, value_style),
       ]);
@@ -131,6 +128,18 @@ fn draw_settings_list(f: &mut Frame<'_>, app: &App, area: Rect) {
       .title(title)
       .style(app.user_config.theme.base_style())
       .border_style(Style::default().fg(app.user_config.theme.inactive)),
+  )
+  .highlight_style(
+    Style::default()
+      .fg(app.user_config.theme.selected)
+      .add_modifier(Modifier::BOLD),
+  )
+  .highlight_symbol(
+    Line::from("▶ ").style(
+      Style::default()
+        .fg(app.user_config.theme.selected)
+        .add_modifier(Modifier::BOLD),
+    ),
   );
 
   f.render_widget(list, area);
