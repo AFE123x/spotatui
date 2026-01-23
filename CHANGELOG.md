@@ -1,10 +1,11 @@
 # Changelog
 
-## [0.35.3] - 2026-01-22
+## [0.35.3] - 2026-01-23
 
 ### Added
 
 - **Playbar Status Messages**: Added transient status messages in the playbar, used to notify when the saved playback device is unavailable and spotatui falls back to native streaming.
+- **Discord Rich Presence**: Show track info, album art, and a GitHub callout in Discord; enabled by default with a built-in application ID and optional overrides via config/env.
 
 ### Fixed
 

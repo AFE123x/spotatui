@@ -30,6 +30,8 @@ mod audio;
 mod banner;
 mod cli;
 mod config;
+#[cfg(feature = "discord-rpc")]
+mod discord_rpc;
 mod event;
 mod handlers;
 #[cfg(all(feature = "macos-media", target_os = "macos"))]
@@ -82,6 +84,11 @@ use std::{
 use tokio::sync::Mutex;
 use user_config::{UserConfig, UserConfigPaths};
 
+#[cfg(feature = "discord-rpc")]
+type DiscordRpcHandle = Option<discord_rpc::DiscordRpcManager>;
+#[cfg(not(feature = "discord-rpc"))]
+type DiscordRpcHandle = Option<()>;
+
 const SCOPES: [&str; 16] = [
   "playlist-read-collaborative",
   "playlist-read-private",
@@ -100,6 +107,153 @@ const SCOPES: [&str; 16] = [
   "user-top-read", // Required for Top Tracks/Artists in Discover
   "streaming",     // Required for native playback
 ];
+
+#[cfg(feature = "discord-rpc")]
+const DEFAULT_DISCORD_CLIENT_ID: &str = "1464235043462447166";
+
+#[cfg(feature = "discord-rpc")]
+#[derive(Clone, Debug, PartialEq)]
+struct DiscordTrackInfo {
+  title: String,
+  artist: String,
+  album: String,
+  image_url: Option<String>,
+  duration_ms: u32,
+}
+
+#[cfg(feature = "discord-rpc")]
+#[derive(Default)]
+struct DiscordPresenceState {
+  last_track: Option<DiscordTrackInfo>,
+  last_is_playing: Option<bool>,
+  last_progress_ms: u128,
+}
+
+#[cfg(feature = "discord-rpc")]
+fn resolve_discord_app_id(user_config: &UserConfig) -> Option<String> {
+  std::env::var("SPOTATUI_DISCORD_APP_ID")
+    .ok()
+    .filter(|value| !value.trim().is_empty())
+    .or_else(|| user_config.behavior.discord_rpc_client_id.clone())
+    .or_else(|| Some(DEFAULT_DISCORD_CLIENT_ID.to_string()))
+}
+
+#[cfg(feature = "discord-rpc")]
+fn build_discord_playback(app: &App) -> Option<discord_rpc::DiscordPlayback> {
+  use crate::ui::util::create_artist_string;
+  use rspotify::model::PlayableItem;
+
+  let (track_info, is_playing) = if let Some(native_info) = &app.native_track_info {
+    let is_playing = app.native_is_playing.unwrap_or(true);
+    (
+      DiscordTrackInfo {
+        title: native_info.name.clone(),
+        artist: native_info.artists_display.clone(),
+        album: native_info.album.clone(),
+        image_url: None,
+        duration_ms: native_info.duration_ms,
+      },
+      is_playing,
+    )
+  } else if let Some(context) = &app.current_playback_context {
+    let is_playing = if app.is_streaming_active {
+      app.native_is_playing.unwrap_or(context.is_playing)
+    } else {
+      context.is_playing
+    };
+
+    let item = context.item.as_ref()?;
+    match item {
+      PlayableItem::Track(track) => (
+        DiscordTrackInfo {
+          title: track.name.clone(),
+          artist: create_artist_string(&track.artists),
+          album: track.album.name.clone(),
+          image_url: track.album.images.first().map(|image| image.url.clone()),
+          duration_ms: track.duration.num_milliseconds() as u32,
+        },
+        is_playing,
+      ),
+      PlayableItem::Episode(episode) => (
+        DiscordTrackInfo {
+          title: episode.name.clone(),
+          artist: episode.show.name.clone(),
+          album: String::new(),
+          image_url: episode.images.first().map(|image| image.url.clone()),
+          duration_ms: episode.duration.num_milliseconds() as u32,
+        },
+        is_playing,
+      ),
+    }
+  } else {
+    return None;
+  };
+
+  let base_state = if track_info.album.is_empty() {
+    track_info.artist.clone()
+  } else {
+    format!("{} - {}", track_info.artist, track_info.album)
+  };
+  let state = if is_playing {
+    base_state
+  } else if base_state.is_empty() {
+    "Paused".to_string()
+  } else {
+    format!("Paused: {}", base_state)
+  };
+
+  Some(discord_rpc::DiscordPlayback {
+    title: track_info.title,
+    artist: track_info.artist,
+    album: track_info.album,
+    state,
+    image_url: track_info.image_url,
+    duration_ms: track_info.duration_ms,
+    progress_ms: app.song_progress_ms,
+    is_playing,
+  })
+}
+
+#[cfg(feature = "discord-rpc")]
+fn update_discord_presence(
+  manager: &discord_rpc::DiscordRpcManager,
+  state: &mut DiscordPresenceState,
+  app: &App,
+) {
+  let playback = build_discord_playback(app);
+
+  match playback {
+    Some(playback) => {
+      let track_info = DiscordTrackInfo {
+        title: playback.title.clone(),
+        artist: playback.artist.clone(),
+        album: playback.album.clone(),
+        image_url: playback.image_url.clone(),
+        duration_ms: playback.duration_ms,
+      };
+
+      let track_changed = state.last_track.as_ref() != Some(&track_info);
+      let playing_changed = state.last_is_playing != Some(playback.is_playing);
+      let progress_delta = playback.progress_ms.abs_diff(state.last_progress_ms);
+      let progress_changed = progress_delta > 5000;
+
+      if track_changed || playing_changed || progress_changed {
+        manager.set_activity(&playback);
+        state.last_track = Some(track_info);
+        state.last_is_playing = Some(playback.is_playing);
+        state.last_progress_ms = playback.progress_ms;
+      }
+    }
+    None => {
+      if state.last_track.is_some() {
+        manager.clear();
+        state.last_track = None;
+        state.last_is_playing = None;
+        state.last_progress_ms = 0;
+      }
+    }
+  }
+}
 
 // Manual token cache helpers since rspotify's built-in caching isn't working
 async fn save_token_to_file(spotify: &AuthCodeSpotify, path: &PathBuf) -> Result<()> {
@@ -614,6 +768,16 @@ of the app. Beware that this comes at a CPU cost!",
         None
       };
 
+    #[cfg(feature = "discord-rpc")]
+    let discord_rpc_manager: DiscordRpcHandle = if user_config.behavior.enable_discord_rpc {
+      resolve_discord_app_id(&user_config)
+        .and_then(|app_id| discord_rpc::DiscordRpcManager::new(app_id).ok())
+    } else {
+      None
+    };
+    #[cfg(not(feature = "discord-rpc"))]
+    let discord_rpc_manager: DiscordRpcHandle = None;
+
     // Spawn MPRIS event handler to process external control requests (media keys, playerctl)
     #[cfg(all(feature = "mpris", target_os = "linux"))]
     if let Some(ref mpris) = mpris_manager {
@@ -762,15 +926,23 @@ of the app. Beware that this comes at a CPU cost!",
       &cloned_app,
       Some(shared_position_for_ui),
       mpris_for_ui,
+      discord_rpc_manager,
     )
     .await?;
     #[cfg(all(
       feature = "streaming",
       not(all(feature = "mpris", target_os = "linux"))
     ))]
-    start_ui(user_config, &cloned_app, Some(shared_position_for_ui), None).await?;
+    start_ui(
+      user_config,
+      &cloned_app,
+      Some(shared_position_for_ui),
+      None,
+      discord_rpc_manager,
+    )
+    .await?;
     #[cfg(not(feature = "streaming"))]
-    start_ui(user_config, &cloned_app, None, None).await?;
+    start_ui(user_config, &cloned_app, None, None, discord_rpc_manager).await?;
   }
 
   Ok(())
@@ -1276,7 +1448,10 @@ async fn start_ui(
   app: &Arc<Mutex<App>>,
   shared_position: Option<Arc<AtomicU64>>,
   mpris_manager: Option<Arc<mpris::MprisManager>>,
+  discord_rpc_manager: DiscordRpcHandle,
 ) -> Result<()> {
+  #[cfg(not(feature = "discord-rpc"))]
+  let _ = discord_rpc_manager;
   // Terminal initialization
   let mut terminal = ratatui::init();
   execute!(stdout(), EnableMouseCapture)?;
@@ -1295,6 +1470,9 @@ async fn start_ui(
   // Lazy audio capture: only capture when in Analysis view
   #[cfg(any(feature = "audio-viz", feature = "audio-viz-cpal"))]
   let mut audio_capture: Option<audio::AudioCaptureManager> = None;
+
+  #[cfg(feature = "discord-rpc")]
+  let mut discord_presence_state = DiscordPresenceState::default();
 
   // Check for updates SYNCHRONOUSLY before starting the event loop
   // This ensures the update prompt appears before any user interaction
@@ -1454,6 +1632,11 @@ async fn start_ui(
         let mut app = app.lock().await;
         app.update_on_tick();
 
+        #[cfg(feature = "discord-rpc")]
+        if let Some(ref manager) = discord_rpc_manager {
+          update_discord_presence(manager, &mut discord_presence_state, &app);
+        }
+
         // Read position from shared atomic if native streaming is active
         // This provides lock-free real-time updates from player events
         if let Some(ref pos) = shared_position {
@@ -1513,6 +1696,11 @@ async fn start_ui(
   execute!(stdout(), DisableMouseCapture)?;
   ratatui::restore();
 
+  #[cfg(feature = "discord-rpc")]
+  if let Some(ref manager) = discord_rpc_manager {
+    manager.clear();
+  }
+
   Ok(())
 }
 
@@ -1523,7 +1711,10 @@ async fn start_ui(
   app: &Arc<Mutex<App>>,
   shared_position: Option<Arc<AtomicU64>>,
   _mpris_manager: Option<()>,
+  discord_rpc_manager: DiscordRpcHandle,
 ) -> Result<()> {
+  #[cfg(not(feature = "discord-rpc"))]
+  let _ = discord_rpc_manager;
   use ratatui::{prelude::Style, widgets::Block};
 
   // Terminal initialization
@@ -1552,6 +1743,9 @@ async fn start_ui(
   // Lazy audio capture: only capture when in Analysis view
   #[cfg(any(feature = "audio-viz", feature = "audio-viz-cpal"))]
   let mut audio_capture: Option<audio::AudioCaptureManager> = None;
+
+  #[cfg(feature = "discord-rpc")]
+  let mut discord_presence_state = DiscordPresenceState::default();
 
   let mut is_first_render = true;
 
@@ -1656,6 +1850,11 @@ async fn start_ui(
         let mut app = app.lock().await;
         app.update_on_tick();
 
+        #[cfg(feature = "discord-rpc")]
+        if let Some(ref manager) = discord_rpc_manager {
+          update_discord_presence(manager, &mut discord_presence_state, &app);
+        }
+
         #[cfg(feature = "streaming")]
         if let Some(ref pos) = shared_position {
           let pos_ms = pos.load(Ordering::Relaxed) as u128;
@@ -1708,6 +1907,11 @@ async fn start_ui(
 
   execute!(stdout(), DisableMouseCapture)?;
   ratatui::restore();
+
+  #[cfg(feature = "discord-rpc")]
+  if let Some(ref manager) = discord_rpc_manager {
+    manager.clear();
+  }
 
   Ok(())
 }

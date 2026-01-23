@@ -514,6 +514,8 @@ pub struct BehaviorConfigString {
   pub show_loading_indicator: Option<bool>,
   pub enforce_wide_search_bar: Option<bool>,
   pub enable_global_song_count: Option<bool>,
+  pub enable_discord_rpc: Option<bool>,
+  pub discord_rpc_client_id: Option<String>,
   pub shuffle_enabled: Option<bool>,
   pub liked_icon: Option<String>,
   pub shuffle_icon: Option<String>,
@@ -535,6 +537,8 @@ pub struct BehaviorConfig {
   pub show_loading_indicator: bool,
   pub enforce_wide_search_bar: bool,
   pub enable_global_song_count: bool,
+  pub enable_discord_rpc: bool,
+  pub discord_rpc_client_id: Option<String>,
   pub shuffle_enabled: bool,
   pub liked_icon: String,
   pub shuffle_icon: String,
@@ -602,6 +606,8 @@ impl UserConfig {
         show_loading_indicator: true,
         enforce_wide_search_bar: false,
         enable_global_song_count: true,
+        enable_discord_rpc: true,
+        discord_rpc_client_id: None,
         shuffle_enabled: false,
         liked_icon: "♥".to_string(),
         shuffle_icon: "🔀".to_string(),
@@ -782,6 +788,14 @@ impl UserConfig {
       self.behavior.enable_global_song_count = enable_global_song_count;
     }
 
+    if let Some(enable_discord_rpc) = behavior_config.enable_discord_rpc {
+      self.behavior.enable_discord_rpc = enable_discord_rpc;
+    }
+
+    if let Some(discord_rpc_client_id) = behavior_config.discord_rpc_client_id {
+      self.behavior.discord_rpc_client_id = Some(discord_rpc_client_id);
+    }
+
     if let Some(shuffle_enabled) = behavior_config.shuffle_enabled {
       self.behavior.shuffle_enabled = shuffle_enabled;
     }
@@ -844,6 +858,8 @@ impl UserConfig {
       show_loading_indicator: Some(self.behavior.show_loading_indicator),
       enforce_wide_search_bar: Some(self.behavior.enforce_wide_search_bar),
       enable_global_song_count: Some(self.behavior.enable_global_song_count),
+      enable_discord_rpc: Some(self.behavior.enable_discord_rpc),
+      discord_rpc_client_id: self.behavior.discord_rpc_client_id.clone(),
       shuffle_enabled: Some(self.behavior.shuffle_enabled),
       liked_icon: Some(self.behavior.liked_icon.clone()),
       shuffle_icon: Some(self.behavior.shuffle_icon.clone()),

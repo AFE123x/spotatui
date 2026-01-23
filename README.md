@@ -32,6 +32,7 @@
 - [Usage](#usage)
 - [Native Streaming](#native-streaming)
 - [Configuration](#configuration)
+- [Discord Rich Presence](#discord-rich-presence)
 - [Limitations](#limitations)
   - [Deprecated Spotify API Features](#deprecated-spotify-api-features)
 - [Using with spotifyd](#using-with-spotifyd)
@@ -165,6 +166,20 @@ See the [Configuration Wiki](https://github.com/LargeModGames/spotatui/wiki/Conf
 You can also configure spotatui in-app by pressing `Alt-,` to open Settings.
 
 See [Themes Wiki](https://github.com/LargeModGames/spotatui/wiki/Themes) for built-in presets (Spotify, Dracula, Nord, etc.).
+
+### Discord Rich Presence
+
+Discord Rich Presence is enabled by default and uses the built-in spotatui application ID, so no extra setup is required.
+
+Overrides (optional):
+
+```yaml
+behavior:
+  enable_discord_rpc: true
+  discord_rpc_client_id: "your_client_id"
+```
+
+You can also override via `SPOTATUI_DISCORD_APP_ID` or disable in the setting or by setting `behavior.enable_discord_rpc: false` in ~/.config/spotatui/config.yml.
 
 ## Limitations
 

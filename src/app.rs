@@ -1552,6 +1552,12 @@ impl App {
           value: SettingValue::Bool(self.user_config.behavior.set_window_title),
         },
         SettingItem {
+          id: "behavior.enable_discord_rpc".to_string(),
+          name: "Discord Rich Presence".to_string(),
+          description: "Show your current track in Discord".to_string(),
+          value: SettingValue::Bool(self.user_config.behavior.enable_discord_rpc),
+        },
+        SettingItem {
           id: "behavior.liked_icon".to_string(),
           name: "Liked Icon".to_string(),
           description: "Icon for liked songs".to_string(),
@@ -1792,6 +1798,11 @@ impl App {
         "behavior.set_window_title" => {
           if let SettingValue::Bool(v) = &setting.value {
             self.user_config.behavior.set_window_title = *v;
+          }
+        }
+        "behavior.enable_discord_rpc" => {
+          if let SettingValue::Bool(v) = &setting.value {
+            self.user_config.behavior.enable_discord_rpc = *v;
           }
         }
         "behavior.liked_icon" => {
