@@ -717,12 +717,20 @@ impl Network {
 
     let mut app = self.app.lock().await;
 
-    // Clamp selected_index to valid range after loading new tracks
+    // Apply pending selection if set
     let track_count = tracks.len();
     if track_count > 0 {
-      let max_index = track_count.saturating_sub(1);
-      if app.track_table.selected_index > max_index {
-        app.track_table.selected_index = max_index;
+      if let Some(pending) = app.pending_track_table_selection.take() {
+        app.track_table.selected_index = match pending {
+          crate::app::PendingTrackSelection::First => 0,
+          crate::app::PendingTrackSelection::Last => track_count.saturating_sub(1),
+        };
+      } else {
+        // Clamp selected_index to valid range if no pending selection
+        let max_index = track_count.saturating_sub(1);
+        if app.track_table.selected_index > max_index {
+          app.track_table.selected_index = max_index;
+        }
       }
     } else {
       app.track_table.selected_index = 0;
@@ -992,6 +1000,17 @@ impl Network {
             app.liked_song_ids_set.insert(track_id.to_string());
           }
         });
+
+        // Apply pending selection if set
+        let track_count = app.track_table.tracks.len();
+        if track_count > 0 {
+          if let Some(pending) = app.pending_track_table_selection.take() {
+            app.track_table.selected_index = match pending {
+              crate::app::PendingTrackSelection::First => 0,
+              crate::app::PendingTrackSelection::Last => track_count.saturating_sub(1),
+            };
+          }
+        }
 
         app.library.saved_tracks.add_pages(saved_tracks);
         app.track_table.context = Some(TrackTableContext::SavedTracks);

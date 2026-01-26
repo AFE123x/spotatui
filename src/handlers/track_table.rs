@@ -1,5 +1,5 @@
 use super::{
-  super::app::{App, RecommendationsContext, TrackTable, TrackTableContext},
+  super::app::{App, PendingTrackSelection, RecommendationsContext, TrackTable, TrackTableContext},
   common_key_events,
 };
 use crate::event::Key;
@@ -31,8 +31,8 @@ pub fn handler(key: Key, app: &mut App) {
                     app.playlist_offset += app.large_search_limit;
                     let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
                     app.dispatch(IoEvent::GetPlaylistItems(playlist_id, app.playlist_offset));
-                    // Keep selection at the last track; it will move to first of new page when loaded
-                    app.track_table.selected_index = 0;
+                    // Set pending selection to move to first track when new page loads
+                    app.pending_track_table_selection = Some(PendingTrackSelection::First);
                     return;
                   }
                 }
@@ -50,7 +50,7 @@ pub fn handler(key: Key, app: &mut App) {
               // If there are more tracks beyond current page
               if current_offset + limit < saved_tracks.total {
                 app.get_current_user_saved_tracks_next();
-                app.track_table.selected_index = 0;
+                app.pending_track_table_selection = Some(PendingTrackSelection::First);
                 return;
               }
             }
@@ -80,9 +80,8 @@ pub fn handler(key: Key, app: &mut App) {
                   app.playlist_offset = app.playlist_offset.saturating_sub(app.large_search_limit);
                   let playlist_id = playlist_id_static_from_ref(&selected_playlist.id);
                   app.dispatch(IoEvent::GetPlaylistItems(playlist_id, app.playlist_offset));
-                  // Set selection to last track of the loaded page
-                  app.track_table.selected_index =
-                    app.large_search_limit.saturating_sub(1) as usize;
+                  // Set pending selection to move to last track when previous page loads
+                  app.pending_track_table_selection = Some(PendingTrackSelection::Last);
                   return;
                 }
               }
@@ -95,8 +94,8 @@ pub fn handler(key: Key, app: &mut App) {
             // Check if there are previous saved tracks to load
             if app.library.saved_tracks.index > 0 {
               app.get_current_user_saved_tracks_previous();
-              // Set selection to last track of the loaded page
-              app.track_table.selected_index = app.large_search_limit.saturating_sub(1) as usize;
+              // Set pending selection to move to last track when previous page loads
+              app.pending_track_table_selection = Some(PendingTrackSelection::Last);
               return;
             }
           }

@@ -526,6 +526,14 @@ pub struct App {
   pub status_message: Option<String>,
   /// When to clear the status message
   pub status_message_expires_at: Option<Instant>,
+  /// Pending track table selection to apply when new page loads
+  pub pending_track_table_selection: Option<PendingTrackSelection>,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum PendingTrackSelection {
+  First,
+  Last,
 }
 
 impl Default for App {
@@ -644,6 +652,7 @@ impl Default for App {
       liked_song_animation_frame: None,
       status_message: None,
       status_message_expires_at: None,
+      pending_track_table_selection: None,
     }
   }
 }
