@@ -134,12 +134,79 @@ jobs:
       - name: Update PKGBUILD
         working-directory: aur-bin
         run: |
+          # Update version and release
           sed -i "s/^pkgver=.*/pkgver=${{ steps.version.outputs.version }}/" PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-          # Remove old multi-line sha256sums and insert new single-line version
-          sed -i '/^sha256sums=/,/)/d' PKGBUILD
-          sed -i "/^sha256sums_x86_64=/i sha256sums=('${{ steps.sha256.outputs.sha256_license }}' '${{ steps.sha256.outputs.sha256_readme }}')" PKGBUILD
-          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('${{ steps.sha256.outputs.sha256_binary }}')/" PKGBUILD
+          
+          # Function to update or add checksum array
+          update_checksums() {
+            local array_name="$1"
+            local checksums="$2"
+            local insert_after="$3"
+            
+            # Check if array exists (single-line or multi-line)
+            if grep -q "^${array_name}=" PKGBUILD; then
+              # Array exists - remove all lines (handles multi-line arrays)
+              sed -i "/^${array_name}=/,/)/d" PKGBUILD
+            fi
+            
+            # Insert new array after the specified pattern
+            if [ -n "$insert_after" ]; then
+              sed -i "/${insert_after}/a ${array_name}=(${checksums})" PKGBUILD
+            else
+              # Fallback: append at end of file
+              echo "${array_name}=(${checksums})" >> PKGBUILD
+            fi
+          }
+          
+          # Update sha256sums (for LICENSE and README)
+          # Insert after source array declaration
+          update_checksums \
+            "sha256sums" \
+            "'${{ steps.sha256.outputs.sha256_license }}' '${{ steps.sha256.outputs.sha256_readme }}'" \
+            "^source.*="
+          
+          # Update sha256sums_x86_64 (for binary tarball)
+          # Insert after source_x86_64 array declaration
+          update_checksums \
+            "sha256sums_x86_64" \
+            "'${{ steps.sha256.outputs.sha256_binary }}'" \
+            "^source_x86_64.*="
+          
+          # Validation: Ensure checksums were added
+          echo "=== Validating PKGBUILD updates ==="
+          echo "Checking pkgver..."
+          grep "^pkgver=" PKGBUILD
+          
+          echo "Checking sha256sums..."
+          if ! grep -q "^sha256sums=" PKGBUILD; then
+            echo "ERROR: sha256sums not found in PKGBUILD"
+            exit 1
+          fi
+          grep "^sha256sums=" PKGBUILD
+          
+          echo "Checking sha256sums_x86_64..."
+          if ! grep -q "^sha256sums_x86_64=" PKGBUILD; then
+            echo "ERROR: sha256sums_x86_64 not found in PKGBUILD"
+            exit 1
+          fi
+          grep "^sha256sums_x86_64=" PKGBUILD
+          
+          echo "Verifying checksums match expected values..."
+          if ! grep -q "${{ steps.sha256.outputs.sha256_license }}" PKGBUILD; then
+            echo "ERROR: LICENSE checksum not found"
+            exit 1
+          fi
+          if ! grep -q "${{ steps.sha256.outputs.sha256_readme }}" PKGBUILD; then
+            echo "ERROR: README checksum not found"
+            exit 1
+          fi
+          if ! grep -q "${{ steps.sha256.outputs.sha256_binary }}" PKGBUILD; then
+            echo "ERROR: Binary checksum not found"
+            exit 1
+          fi
+          
+          echo "=== PKGBUILD validation successful ==="
 
       - name: Generate .SRCINFO
         working-directory: aur-bin
