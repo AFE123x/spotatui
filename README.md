@@ -23,27 +23,30 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 ## Table of Contents
 
-- [Help Wanted](#help-wanted)
-- [Performance](#performance)
-- [Privacy Notice](#privacy-notice)
-- [Migrating from spotify-tui](#migrating-from-spotify-tui)
-- [Installation](#installation)
-- [Connecting to Spotify](#connecting-to-spotify)
-- [Usage](#usage)
-- [Native Streaming](#native-streaming)
-- [Configuration](#configuration)
-  - [Discord Rich Presence](#discord-rich-presence)
-- [Limitations](#limitations)
-  - [Deprecated Spotify API Features](#deprecated-spotify-api-features)
-- [Using with spotifyd](#using-with-spotifyd)
-- [Libraries used](#libraries-used)
-- [Development](#development)
-  - [Windows Subsystem for Linux](#windows-subsystem-for-linux)
-- [Maintainer](#maintainer)
-- [spotatui Contributors](#spotatui-contributors)
-- [Upstream Contributors (spotify-tui)](#upstream-contributors-spotify-tui)
-- [Star History](#star-history)
-- [Roadmap](#roadmap)
+- [spotatui](#spotatui)
+  - [Song History](#song-history)
+  - [Table of Contents](#table-of-contents)
+  - [Help Wanted](#help-wanted)
+  - [Performance](#performance)
+  - [Privacy Notice](#privacy-notice)
+  - [Migrating from spotify-tui](#migrating-from-spotify-tui)
+  - [Installation](#installation)
+  - [Connecting to Spotify](#connecting-to-spotify)
+  - [Usage](#usage)
+  - [Native Streaming](#native-streaming)
+  - [Configuration](#configuration)
+    - [Discord Rich Presence](#discord-rich-presence)
+  - [Limitations](#limitations)
+    - [Deprecated Spotify API Features](#deprecated-spotify-api-features)
+  - [Using with spotifyd](#using-with-spotifyd)
+  - [Libraries used](#libraries-used)
+  - [Development](#development)
+    - [Windows Subsystem for Linux](#windows-subsystem-for-linux)
+  - [Maintainer](#maintainer)
+  - [spotatui Contributors](#spotatui-contributors)
+  - [Upstream Contributors (spotify-tui)](#upstream-contributors-spotify-tui)
+  - [Star History](#star-history)
+  - [Roadmap](#roadmap)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -104,7 +107,14 @@ You may be asked to re-authenticate with Spotify the first time.
 ## Installation
 
 ```bash
-# Cargo (recommended)
+# Homebrew (macOS/Linux)
+brew tap LargeModGames/spotatui
+brew install spotatui
+
+# Winget (Windows)
+winget install spotatui
+
+# Cargo
 cargo install spotatui
 
 # Arch Linux (AUR) - pre-built binary (faster)
@@ -201,11 +211,11 @@ If you want to play tracks, Spotify requires that you have a Premium account.
 - **Audio Visualization** (press `v`): Now uses **local real-time FFT analysis** of your system audio. The visualization no longer depends on Spotify's deprecated Audio Analysis API.
 
   **Platform Support:**
-  | Platform    | Status                 | Notes                                    |
-  | ----------- | ---------------------- | ---------------------------------------- |
+  | Platform    | Status               | Notes                                    |
+  | ----------- | -------------------- | ---------------------------------------- |
   | **Windows** | Works out of the box | Uses WASAPI loopback                     |
   | **Linux**   | Works out of the box | Uses PipeWire/PulseAudio monitor devices |
-  | **macOS**   | Requires setup      | Needs a virtual audio device (see below) |
+  | **macOS**   | Requires setup       | Needs a virtual audio device (see below) |
 
   > **macOS Users:** macOS doesn't natively expose system audio loopback. To use audio visualization, install a virtual audio device like [BlackHole](https://github.com/ExistentialAudio/BlackHole) (free) or [Loopback](https://rogueamoeba.com/loopback/) (paid). Configure it to capture system audio and set it as your default input device.
 
@@ -273,6 +283,9 @@ Originally forked from [spotify-tui](https://github.com/Rigellute/spotify-tui) b
 
 **Looking for contributors!** spotatui is actively maintained but could use your help. Whether it's bug fixes, new features, documentation, or testing - all contributions are welcome!
 
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
 <table>
   <tbody>
     <tr>
@@ -282,9 +295,15 @@ Originally forked from [spotify-tui](https://github.com/Rigellute/spotify-tui) b
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/copeison"><img src="https://avatars.githubusercontent.com/u/184175589?v=4?s=100" width="100px;" alt="copeison"/><br /><sub><b>copeison</b></sub></a><br /><a href="#platform-copeison" title="Packaging/porting to new platform">📦</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/jacklorusso"><img src="https://avatars.githubusercontent.com/u/19835679?v=4?s=100" width="100px;" alt="jacklorusso"/><br /><sub><b>jacklorusso</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=jacklorusso" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/H41L33"><img src="https://avatars.githubusercontent.com/u/140116782?v=4?s=100" width="100px;" alt="H41L33"/><br /><sub><b>H41L33</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=H41L33" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://mzte.de"><img src="https://avatars.githubusercontent.com/u/28735087?v=4?s=100" width="100px;" alt="LordMZTE"/><br /><sub><b>LordMZTE</b></sub></a><br /><a href="https://github.com/LargeModGames/spotatui/commits?author=LordMZTE" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 *Want to see your name here? Check out our [open issues](https://github.com/LargeModGames/spotatui/issues) or the [Roadmap](#roadmap) below!*
 

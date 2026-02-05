@@ -12,6 +12,14 @@ The release is triggered by pushing a tag.
 1. Wait for the build to finish on the [Actions page](https://github.com/LargeModGames/spotatui/actions)
 1. This should publish to cargo as well
 
-### Homebrew / Scoop Packaging
+### Homebrew Packaging
 
-TODO: Homebrew and Scoop packaging is not yet set up for spotatui. If you'd like to contribute packaging, PRs are welcome!
+Homebrew publishing is automated via the CD workflow. When you push a new tag:
+
+1. The `publish-homebrew` job downloads the release artifacts
+2. Calculates SHA256 checksums for each platform binary
+3. Updates the formula in [homebrew-spotatui](https://github.com/LargeModGames/homebrew-spotatui)
+
+
+
+TODO: Scoop packaging is not yet set up for spotatui. If you'd like to contribute packaging, PRs are welcome!

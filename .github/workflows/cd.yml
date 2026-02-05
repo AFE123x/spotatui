@@ -449,3 +449,105 @@ jobs:
           identifier: LargeModGames.spotatui
           installers-regex: '-windows-x86_64\.zip$'
           token: ${{ secrets.WINGET_TOKEN }}
+
+  publish-homebrew:
+    name: Publish to Homebrew
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Calculate SHA256 checksums
+        id: sha256
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # macOS aarch64
+          AARCH64_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/spotatui-macos-aarch64.tar.gz"
+          SHA256_AARCH64=$(curl -sL "$AARCH64_URL" | sha256sum | awk '{print $1}')
+          echo "sha256_aarch64=$SHA256_AARCH64" >> $GITHUB_OUTPUT
+          echo "macOS aarch64 SHA256: $SHA256_AARCH64"
+
+          # macOS x86_64
+          X86_64_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/spotatui-macos-x86_64.tar.gz"
+          SHA256_X86_64=$(curl -sL "$X86_64_URL" | sha256sum | awk '{print $1}')
+          echo "sha256_x86_64=$SHA256_X86_64" >> $GITHUB_OUTPUT
+          echo "macOS x86_64 SHA256: $SHA256_X86_64"
+
+      - name: Setup SSH for Homebrew tap
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HOMEBREW_TAP_SSH_KEY }}" > ~/.ssh/homebrew_tap
+          chmod 600 ~/.ssh/homebrew_tap
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone Homebrew tap repository
+        run: |
+          GIT_SSH_COMMAND='ssh -i ~/.ssh/homebrew_tap -o IdentitiesOnly=yes' \
+            git clone git@github.com:LargeModGames/homebrew-spotatui.git homebrew-tap
+
+      - name: Update formula
+        working-directory: homebrew-tap
+        run: |
+          cat > Formula/spotatui.rb << 'FORMULA_EOF'
+          # typed: false
+          # frozen_string_literal: true
+
+          # This formula is automatically updated by the CD workflow on each release.
+          # Manual changes will be overwritten.
+
+          class Spotatui < Formula
+            desc "Spotify client for the terminal written in Rust, powered by Ratatui"
+            homepage "https://github.com/LargeModGames/spotatui"
+            version "${{ steps.version.outputs.version }}"
+            license "MIT"
+
+            depends_on :macos
+
+            on_arm do
+              url "https://github.com/LargeModGames/spotatui/releases/download/v#{version}/spotatui-macos-aarch64.tar.gz"
+              sha256 "${{ steps.sha256.outputs.sha256_aarch64 }}"
+            end
+
+            on_intel do
+              url "https://github.com/LargeModGames/spotatui/releases/download/v#{version}/spotatui-macos-x86_64.tar.gz"
+              sha256 "${{ steps.sha256.outputs.sha256_x86_64 }}"
+            end
+
+            def install
+              bin.install "spotatui"
+            end
+
+            def caveats
+              <<~EOS
+                To use spotatui, you need a Spotify Premium account and must set up
+                Spotify API credentials. Run `spotatui` for first-time setup instructions.
+
+                For native streaming support, ensure you have a Spotify Premium subscription.
+                More info: https://github.com/LargeModGames/spotatui
+              EOS
+            end
+
+            test do
+              assert_match "spotatui", shell_output("#{bin}/spotatui --version")
+            end
+          end
+          FORMULA_EOF
+
+      - name: Commit and push to Homebrew tap
+        working-directory: homebrew-tap
+        run: |
+          git add Formula/spotatui.rb
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update spotatui to ${{ steps.version.outputs.version }}"
+          GIT_SSH_COMMAND='ssh -i ~/.ssh/homebrew_tap -o IdentitiesOnly=yes' git push
