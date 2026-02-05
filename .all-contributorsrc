@@ -3,7 +3,9 @@
   "projectOwner": "LargeModGames",
   "repoType": "github",
   "repoHost": "https://github.com",
-  "files": ["README.md"],
+  "files": [
+    "README.md"
+  ],
   "imageSize": 100,
   "commit": true,
   "commitConvention": "angular",
@@ -13,45 +15,73 @@
       "name": "LargeModGames",
       "avatar_url": "https://avatars.githubusercontent.com/u/84450916?v=4",
       "profile": "https://github.com/LargeModGames",
-      "contributions": ["code", "doc", "maintenance", "ideas", "infra", "test"]
+      "contributions": [
+        "code",
+        "doc",
+        "maintenance",
+        "ideas",
+        "infra",
+        "test"
+      ]
     },
     {
       "login": "MysteriousWolf",
       "name": "MysteriousWolf",
       "avatar_url": "https://avatars.githubusercontent.com/u/5306409?v=4",
       "profile": "https://github.com/MysteriousWolf",
-      "contributions": ["code"]
+      "contributions": [
+        "code"
+      ]
     },
     {
       "login": "rawcode1337",
       "name": "rawcode1337",
       "avatar_url": "https://avatars.githubusercontent.com/u/80097670?v=4",
       "profile": "https://github.com/rawcode1337",
-      "contributions": ["code", "bug"]
+      "contributions": [
+        "code",
+        "bug"
+      ]
     },
     {
       "login": "copeison",
       "name": "copeison",
       "avatar_url": "https://avatars.githubusercontent.com/u/184175589?v=4",
       "profile": "https://github.com/copeison",
-      "contributions": ["platform"]
+      "contributions": [
+        "platform"
+      ]
     },
     {
       "login": "jacklorusso",
       "name": "jacklorusso",
       "avatar_url": "https://avatars.githubusercontent.com/u/19835679?v=4",
       "profile": "https://github.com/jacklorusso",
-      "contributions": ["doc"]
+      "contributions": [
+        "doc"
+      ]
     },
     {
       "login": "H41L33",
       "name": "H41L33",
       "avatar_url": "https://avatars.githubusercontent.com/u/140116782?v=4",
       "profile": "https://github.com/H41L33",
-      "contributions": ["doc"]
+      "contributions": [
+        "doc"
+      ]
+    },
+    {
+      "login": "LordMZTE",
+      "name": "LordMZTE",
+      "avatar_url": "https://avatars.githubusercontent.com/u/28735087?v=4",
+      "profile": "https://mzte.de",
+      "contributions": [
+        "code"
+      ]
     }
   ],
   "contributorsPerLine": 7,
   "skipCi": true,
-  "contributorsSortAlphabetically": false
+  "contributorsSortAlphabetically": false,
+  "commitType": "docs"
 }
