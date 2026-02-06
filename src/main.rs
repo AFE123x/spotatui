@@ -1090,7 +1090,7 @@ async fn handle_player_events(
 
         // Update MPRIS metadata
         if let Some(ref mpris) = mpris_manager {
-          mpris.set_metadata(&audio_item.name, &artists, &album, audio_item.duration_ms);
+          mpris.set_metadata(&audio_item.name, &artists, &album, audio_item.duration_ms, None);
         }
 
         if let Ok(mut app) = app.try_lock() {
@@ -1629,6 +1629,20 @@ async fn start_ui(
           update_discord_presence(manager, &mut discord_presence_state, &app);
         }
 
+        #[cfg(feature = "mpris")]
+        if let Some(ref mpris) = mpris_manager {
+          if let Some(playback) = build_discord_playback(&app) {
+            let artists: Vec<String> = playback.artist.split(", ").map(String::from).collect();
+            mpris.set_metadata(
+              &playback.title,
+              &artists,
+              &playback.album,
+              playback.duration_ms,
+              playback.image_url,
+            );
+          }
+        }
+
         // Read position from shared atomic if native streaming is active
         // This provides lock-free real-time updates from player events
         if let Some(ref pos) = shared_position {
@@ -1863,6 +1877,20 @@ async fn start_ui(
         #[cfg(feature = "discord-rpc")]
         if let Some(ref manager) = discord_rpc_manager {
           update_discord_presence(manager, &mut discord_presence_state, &app);
+        }
+
+        #[cfg(feature = "mpris")]
+        if let Some(ref mpris) = mpris_manager {
+          if let Some(playback) = build_discord_playback(&app) {
+            let artists: Vec<String> = playback.artist.split(", ").map(String::from).collect();
+            mpris.set_metadata(
+              &playback.title,
+              &artists,
+              &playback.album,
+              playback.duration_ms,
+              playback.image_url,
+            );
+          }
         }
 
         #[cfg(feature = "streaming")]
