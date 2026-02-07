@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.35.6] - 2026-02-07
+
+### Added
+
+- **MPRIS Album Art Metadata (Linux)**: MPRIS metadata now includes artwork URLs so desktop media controls can show album covers.
+- **Automated Homebrew Publishing**: Added a `publish-homebrew` release job to update the Homebrew tap formula on tagged releases.
+
+### Fixed
+
+- **Slim Build Compilation**: Fixed feature gating and conditional imports so builds without `streaming` compile cleanly.
+- **Update Check Arc Cloning**: Corrected `Arc` cloning in the async update check task.
+- **AUR PKGBUILD Checksum Updates**: Reworked checksum replacement using `awk` and added validation checks to prevent malformed PKGBUILD updates in release workflows.
+- **macOS Streaming Audio Backend**: Defaulted `librespot-playback` to `portaudio-backend` on macOS to avoid pipe-sink fallback issues.
+- **Reqwest Dependency Resolution**: Made `reqwest` mandatory to prevent missing-dependency build failures (fixes #73).
+
+### Changed
+
+- **Dependency Updates**: Updated `discord-rich-presence` to 1.1.0, `clap` to 4.5.56, `time` to 0.3.47, and `bytes` to 1.11.1.
+- **Project Metadata and Docs**: Updated installation docs (Homebrew and Winget), funding metadata, and contributor acknowledgements.
+
 ## [0.35.5] - 2026-01-26
 
 ### Added
