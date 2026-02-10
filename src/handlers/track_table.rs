@@ -358,9 +358,9 @@ fn on_enter(app: &mut App) {
           // Get the track ID to play
           let track_playable_id = track_playable_id(track.id.clone());
 
-          let context_id = match (&app.active_playlist_index, &app.playlists) {
-            (Some(active_playlist_index), Some(playlists)) => playlists
-              .items
+          let context_id = match &app.active_playlist_index {
+            Some(active_playlist_index) => app
+              .all_playlists
               .get(active_playlist_index.to_owned())
               .map(|selected_playlist| playlist_context_id_from_ref(&selected_playlist.id)),
             _ => None,
