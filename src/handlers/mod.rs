@@ -102,6 +102,12 @@ pub fn handle_app(key: Key, app: &mut App) {
       app.load_settings_for_category();
       app.push_navigation_stack(RouteId::Settings, ActiveBlock::Settings);
     }
+    Key::Char('W') => match app.get_current_route().active_block {
+      ActiveBlock::Input | ActiveBlock::Dialog(_) | ActiveBlock::UpdatePrompt => {
+        handle_block_events(key, app);
+      }
+      _ => playbar::add_currently_playing_track_to_playlist(app),
+    },
     _ => handle_block_events(key, app),
   }
 }
@@ -203,6 +209,9 @@ fn handle_escape(app: &mut App) {
     }
     ActiveBlock::Dialog(_) => {
       app.pop_navigation_stack();
+      app.dialog = None;
+      app.confirm = false;
+      app.clear_playlist_track_dialog_state();
     }
     ActiveBlock::HelpMenu => {
       app.pop_navigation_stack();
@@ -275,4 +284,33 @@ fn handle_jump_to_artist_album(app: &mut App) {
       }
     }
   };
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn global_shift_w_adds_current_track_from_anywhere() {
+    let mut app = App::default();
+    app.set_current_route_state(Some(ActiveBlock::Empty), Some(ActiveBlock::Library));
+
+    handle_app(Key::Char('W'), &mut app);
+
+    assert_eq!(
+      app.status_message.as_deref(),
+      Some("No track currently playing")
+    );
+  }
+
+  #[test]
+  fn global_shift_w_is_not_intercepted_in_input_mode() {
+    let mut app = App::default();
+    app.set_current_route_state(Some(ActiveBlock::Input), Some(ActiveBlock::Input));
+
+    handle_app(Key::Char('W'), &mut app);
+
+    assert_eq!(app.input, vec!['W']);
+    assert!(app.status_message.is_none());
+  }
 }
