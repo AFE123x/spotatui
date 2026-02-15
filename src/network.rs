@@ -81,6 +81,8 @@ pub enum IoEvent {
   UserFollowArtists(Vec<ArtistId<'static>>),
   UserFollowPlaylist(UserId<'static>, PlaylistId<'static>, Option<bool>),
   UserUnfollowPlaylist(UserId<'static>, PlaylistId<'static>),
+  AddTrackToPlaylist(PlaylistId<'static>, TrackId<'static>),
+  RemoveTrackFromPlaylistAtPosition(PlaylistId<'static>, TrackId<'static>, usize),
   GetUser,
   ToggleSaveTrack(PlayableId<'static>),
   GetRecommendationsForTrackId(TrackId<'static>, Option<Country>),
@@ -340,6 +342,14 @@ impl Network {
       }
       IoEvent::UserUnfollowPlaylist(user_id, playlist_id) => {
         self.user_unfollow_playlist(user_id, playlist_id).await;
+      }
+      IoEvent::AddTrackToPlaylist(playlist_id, track_id) => {
+        self.add_track_to_playlist(playlist_id, track_id).await;
+      }
+      IoEvent::RemoveTrackFromPlaylistAtPosition(playlist_id, track_id, position) => {
+        self
+          .remove_track_from_playlist_at_position(playlist_id, track_id, position)
+          .await;
       }
 
       IoEvent::ToggleSaveTrack(track_id) => {
@@ -1047,17 +1057,20 @@ impl Network {
   }
 
   async fn set_playlist_tracks_to_table(&mut self, playlist_track_page: &Page<PlaylistItem>) {
-    let tracks = playlist_track_page
-      .items
-      .clone()
-      .into_iter()
-      .filter_map(|item| item.track)
-      .filter_map(|track| match track {
-        PlayableItem::Track(full_track) => Some(full_track),
-        PlayableItem::Episode(_) => None,
-      })
-      .collect::<Vec<FullTrack>>();
+    let mut tracks: Vec<FullTrack> = Vec::new();
+    let mut positions: Vec<usize> = Vec::new();
+
+    for (idx, item) in playlist_track_page.items.iter().enumerate() {
+      if let Some(PlayableItem::Track(full_track)) = item.track.as_ref() {
+        tracks.push(full_track.clone());
+        positions.push(playlist_track_page.offset as usize + idx);
+      }
+    }
+
     self.set_tracks_to_table(tracks).await;
+
+    let mut app = self.app.lock().await;
+    app.playlist_track_positions = Some(positions);
   }
 
   async fn set_tracks_to_table(&mut self, tracks: Vec<FullTrack>) {
@@ -1068,6 +1081,7 @@ impl Network {
       .collect();
 
     let mut app = self.app.lock().await;
+    app.playlist_track_positions = None;
 
     // Apply pending selection if set
     let track_count = tracks.len();
@@ -1909,8 +1923,9 @@ impl Network {
       return;
     }
 
-    // Collect all playlist items
-    let mut all_items: Vec<rspotify::model::playlist::PlaylistItem> = Vec::new();
+    // Collect all playlist items in source order with original positions.
+    let mut all_items_with_positions: Vec<(usize, rspotify::model::playlist::PlaylistItem)> =
+      Vec::new();
     let mut offset = 0;
 
     while offset < total {
@@ -1924,7 +1939,9 @@ impl Network {
         .await
       {
         Ok(page) => {
-          all_items.extend(page.items);
+          for (idx, item) in page.items.into_iter().enumerate() {
+            all_items_with_positions.push((offset as usize + idx, item));
+          }
         }
         Err(_e) => {
           break;
@@ -1934,12 +1951,12 @@ impl Network {
     }
 
     // Sort all items
-    all_items.sort_by(|a, b| {
-      let track_a = a.track.as_ref().and_then(|t| match t {
+    all_items_with_positions.sort_by(|a, b| {
+      let track_a = a.1.track.as_ref().and_then(|t| match t {
         PlayableItem::Track(track) => Some(track),
         PlayableItem::Episode(_) => None,
       });
-      let track_b = b.track.as_ref().and_then(|t| match t {
+      let track_b = b.1.track.as_ref().and_then(|t| match t {
         PlayableItem::Track(track) => Some(track),
         PlayableItem::Episode(_) => None,
       });
@@ -1967,7 +1984,7 @@ impl Network {
             .to_lowercase()
             .cmp(&tb.album.name.to_lowercase()),
           crate::sort::SortField::Duration => ta.duration.cmp(&tb.duration),
-          crate::sort::SortField::DateAdded => a.added_at.cmp(&b.added_at),
+          crate::sort::SortField::DateAdded => a.1.added_at.cmp(&b.1.added_at),
         },
         (Some(_), None) => std::cmp::Ordering::Less,
         (None, Some(_)) => std::cmp::Ordering::Greater,
@@ -1981,28 +1998,31 @@ impl Network {
       }
     });
 
-    // Extract tracks and update app state
-    let sorted_tracks: Vec<rspotify::model::FullTrack> = all_items
-      .iter()
-      .filter_map(|item| item.track.as_ref())
-      .filter_map(|track| match track {
-        PlayableItem::Track(full_track) => Some(full_track.clone()),
-        PlayableItem::Episode(_) => None,
-      })
-      .collect();
+    // Extract sorted playlist items, table tracks, and row->position mapping.
+    let mut sorted_playlist_items: Vec<rspotify::model::playlist::PlaylistItem> = Vec::new();
+    let mut sorted_tracks: Vec<rspotify::model::FullTrack> = Vec::new();
+    let mut sorted_positions: Vec<usize> = Vec::new();
+    for (original_position, item) in all_items_with_positions {
+      if let Some(PlayableItem::Track(full_track)) = item.track.as_ref() {
+        sorted_tracks.push(full_track.clone());
+        sorted_positions.push(original_position);
+      }
+      sorted_playlist_items.push(item);
+    }
 
     // Update app state with sorted data
     let mut app = self.app.lock().await;
 
     // Update playlist_tracks with sorted items
     if let Some(ref mut playlist_tracks) = app.playlist_tracks {
-      playlist_tracks.items = all_items;
+      playlist_tracks.items = sorted_playlist_items;
       playlist_tracks.total = total;
     }
 
     // Update track table with sorted tracks
     app.track_table.tracks = sorted_tracks;
     app.track_table.selected_index = 0;
+    app.playlist_track_positions = Some(sorted_positions);
   }
 
   async fn seek(&mut self, position_ms: u32) {
@@ -2900,6 +2920,221 @@ impl Network {
       }
       Err(e) => {
         self.handle_error(anyhow!(e)).await;
+      }
+    }
+  }
+
+  fn playlist_mutation_error_message(error: &anyhow::Error, action: &str) -> String {
+    let msg = error.to_string();
+    if msg.contains("Spotify API 403") {
+      return format!("No permission to {} playlist", action);
+    }
+    if msg.contains("Spotify API 404") {
+      return format!("Playlist/track not found while trying to {}", action);
+    }
+    if msg.contains("Spotify API 429") {
+      return "Spotify rate limit hit, retry shortly".to_string();
+    }
+    format!("Could not {}: {}", action, msg)
+  }
+
+  fn playlist_items_path(playlist_id: &PlaylistId<'_>) -> String {
+    format!("playlists/{}/items", playlist_id.id())
+  }
+
+  fn playlist_uris_payload(uris: &[String]) -> Value {
+    json!({
+      "uris": uris
+    })
+  }
+
+  fn remove_playlist_item_uri_at_position(
+    mut uris: Vec<String>,
+    position: usize,
+  ) -> anyhow::Result<Vec<String>> {
+    if position >= uris.len() {
+      return Err(anyhow!(
+        "Cannot resolve track position {} in playlist with {} items",
+        position,
+        uris.len()
+      ));
+    }
+    uris.remove(position);
+    Ok(uris)
+  }
+
+  fn playlist_item_uri(item: &PlaylistItem) -> anyhow::Result<String> {
+    match item.track.as_ref() {
+      Some(PlayableItem::Track(track)) => track
+        .id
+        .as_ref()
+        .map(|id| format!("spotify:track:{}", id.id()))
+        .ok_or_else(|| anyhow!("Playlist contains a local track that cannot be edited")),
+      Some(PlayableItem::Episode(episode)) => Ok(format!("spotify:episode:{}", episode.id.id())),
+      None => Err(anyhow!(
+        "Playlist contains an unavailable item that cannot be edited"
+      )),
+    }
+  }
+
+  async fn get_playlist_item_uris(
+    &self,
+    playlist_id: &PlaylistId<'_>,
+  ) -> anyhow::Result<Vec<String>> {
+    let path = Self::playlist_items_path(playlist_id);
+    let mut uris: Vec<String> = Vec::new();
+    let mut offset: u32 = 0;
+    let limit: u32 = 100;
+
+    loop {
+      let page = self
+        .spotify_get_typed_compat::<Page<PlaylistItem>>(
+          &path,
+          &[("limit", limit.to_string()), ("offset", offset.to_string())],
+        )
+        .await?;
+
+      if page.items.is_empty() {
+        break;
+      }
+
+      for item in &page.items {
+        uris.push(Self::playlist_item_uri(item)?);
+      }
+
+      offset = offset.saturating_add(page.items.len() as u32);
+      if offset >= page.total {
+        break;
+      }
+    }
+
+    Ok(uris)
+  }
+
+  async fn replace_playlist_items_with_uris(
+    &self,
+    playlist_id: &PlaylistId<'_>,
+    uris: &[String],
+  ) -> anyhow::Result<()> {
+    let path = Self::playlist_items_path(playlist_id);
+
+    let first_chunk: Vec<String> = uris.iter().take(100).cloned().collect();
+    Self::spotify_api_request_json_for(
+      &self.spotify,
+      Method::PUT,
+      &path,
+      &[],
+      Some(Self::playlist_uris_payload(&first_chunk)),
+    )
+    .await?;
+
+    for chunk in uris.chunks(100).skip(1) {
+      let chunk_vec = chunk.to_vec();
+      Self::spotify_api_request_json_for(
+        &self.spotify,
+        Method::POST,
+        &path,
+        &[],
+        Some(Self::playlist_uris_payload(&chunk_vec)),
+      )
+      .await?;
+    }
+
+    Ok(())
+  }
+
+  async fn refresh_playlist_if_open(&mut self, playlist_id: PlaylistId<'_>) {
+    let playlist_id_str = playlist_id.id().to_string();
+    let mut app = self.app.lock().await;
+
+    let should_refresh = match app.track_table.context {
+      Some(TrackTableContext::MyPlaylists) => app
+        .active_playlist_index
+        .and_then(|idx| app.all_playlists.get(idx))
+        .is_some_and(|p| p.id.id() == playlist_id_str),
+      Some(TrackTableContext::PlaylistSearch) => app
+        .search_results
+        .selected_playlists_index
+        .and_then(|idx| {
+          app
+            .search_results
+            .playlists
+            .as_ref()
+            .and_then(|r| r.items.get(idx))
+        })
+        .is_some_and(|p| p.id.id() == playlist_id_str),
+      _ => false,
+    };
+
+    if should_refresh {
+      let offset = app.playlist_offset;
+      app.dispatch(IoEvent::GetPlaylistItems(playlist_id.into_static(), offset));
+    }
+  }
+
+  async fn add_track_to_playlist(&mut self, playlist_id: PlaylistId<'_>, track_id: TrackId<'_>) {
+    let path = Self::playlist_items_path(&playlist_id);
+    let track_uri = format!("spotify:track:{}", track_id.id());
+    let payload = Self::playlist_uris_payload(&[track_uri]);
+
+    match Self::spotify_api_request_json_for(&self.spotify, Method::POST, &path, &[], Some(payload))
+      .await
+    {
+      Ok(_) => {
+        self
+          .show_status_message("Track added to playlist".to_string(), 4)
+          .await;
+        self.refresh_playlist_if_open(playlist_id).await;
+      }
+      Err(e) => {
+        self
+          .show_status_message(
+            Self::playlist_mutation_error_message(&e, "add track to playlist"),
+            5,
+          )
+          .await;
+      }
+    }
+  }
+
+  async fn remove_track_from_playlist_at_position(
+    &mut self,
+    playlist_id: PlaylistId<'_>,
+    track_id: TrackId<'_>,
+    position: usize,
+  ) {
+    let result = async {
+      let uris = self.get_playlist_item_uris(&playlist_id).await?;
+      let expected_track_uri = format!("spotify:track:{}", track_id.id());
+      let selected_uri = uris
+        .get(position)
+        .ok_or_else(|| anyhow!("Cannot resolve track position for removal"))?;
+      if selected_uri != &expected_track_uri {
+        return Err(anyhow!(
+          "Selected playlist row is out of sync with Spotify; refresh and retry"
+        ));
+      }
+      let uris_after_removal = Self::remove_playlist_item_uri_at_position(uris, position)?;
+      self
+        .replace_playlist_items_with_uris(&playlist_id, &uris_after_removal)
+        .await
+    }
+    .await;
+
+    match result {
+      Ok(()) => {
+        self
+          .show_status_message("Track removed from playlist".to_string(), 4)
+          .await;
+        self.refresh_playlist_if_open(playlist_id).await;
+      }
+      Err(e) => {
+        self
+          .show_status_message(
+            Self::playlist_mutation_error_message(&e, "remove track from playlist"),
+            5,
+          )
+          .await;
       }
     }
   }
@@ -4105,4 +4340,65 @@ fn structurize_playlist_folders(
   }
 
   items
+}
+
+#[cfg(test)]
+mod tests {
+  use super::Network;
+  use anyhow::Result;
+  use rspotify::model::idtypes::PlaylistId;
+  use serde_json::json;
+
+  #[test]
+  fn playlist_items_path_uses_items_endpoint() {
+    let playlist_id = PlaylistId::from_id("37i9dQZF1DXcBWIGoYBM5M").expect("valid playlist id");
+    let path = Network::playlist_items_path(&playlist_id);
+    assert_eq!(path, "playlists/37i9dQZF1DXcBWIGoYBM5M/items");
+  }
+
+  #[test]
+  fn playlist_uris_payload_uses_uris_shape() {
+    let payload = Network::playlist_uris_payload(&[
+      "spotify:track:6rqhFgbbKwnb9MLmUQDhG6".to_string(),
+      "spotify:episode:4rOoJ6Egrf8K2IrywzwOMk".to_string(),
+    ]);
+    assert_eq!(
+      payload,
+      json!({
+        "uris": [
+          "spotify:track:6rqhFgbbKwnb9MLmUQDhG6",
+          "spotify:episode:4rOoJ6Egrf8K2IrywzwOMk"
+        ]
+      })
+    );
+  }
+
+  #[test]
+  fn remove_playlist_item_uri_at_position_keeps_other_duplicates() -> Result<()> {
+    let uris = vec![
+      "spotify:track:A".to_string(),
+      "spotify:track:B".to_string(),
+      "spotify:track:A".to_string(),
+      "spotify:track:C".to_string(),
+    ];
+
+    let updated = Network::remove_playlist_item_uri_at_position(uris, 2)?;
+
+    assert_eq!(
+      updated,
+      vec![
+        "spotify:track:A".to_string(),
+        "spotify:track:B".to_string(),
+        "spotify:track:C".to_string(),
+      ]
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn remove_playlist_item_uri_at_position_errors_when_out_of_bounds() {
+    let err = Network::remove_playlist_item_uri_at_position(vec!["spotify:track:A".to_string()], 1)
+      .expect_err("position beyond playlist length should fail");
+    assert!(err.to_string().contains("Cannot resolve track position"));
+  }
 }

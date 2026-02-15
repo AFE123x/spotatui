@@ -1,5 +1,8 @@
 use super::{
-  super::app::{App, PendingTrackSelection, RecommendationsContext, TrackTable, TrackTableContext},
+  super::app::{
+    ActiveBlock, App, DialogContext, PendingPlaylistTrackRemoval, PendingTrackSelection,
+    RecommendationsContext, RouteId, TrackTable, TrackTableContext,
+  },
   common_key_events,
 };
 use crate::event::Key;
@@ -160,6 +163,8 @@ pub fn handler(key: Key, app: &mut App) {
         }
       };
     }
+    Key::Char('w') => open_add_to_playlist_dialog(app),
+    Key::Char('x') => open_remove_from_playlist_dialog(app),
     Key::Char('s') => handle_save_track_event(app),
     Key::Char('S') => play_random_song(app),
     k if k == app.user_config.keys.jump_to_end => jump_to_end(app),
@@ -175,6 +180,72 @@ pub fn handler(key: Key, app: &mut App) {
     }
     _ => {}
   }
+}
+
+fn open_add_to_playlist_dialog(app: &mut App) {
+  let track = match app.track_table.tracks.get(app.track_table.selected_index) {
+    Some(track) => track,
+    None => return,
+  };
+
+  let track_id = track.id.clone().map(|id| id.into_static());
+  let track_name = track.name.clone();
+  app.begin_add_track_to_playlist_flow(track_id, track_name);
+}
+
+fn open_remove_from_playlist_dialog(app: &mut App) {
+  let playlist_context = match active_playlist_target_for_track_table_context(app) {
+    Some(context) => context,
+    None => {
+      app.set_status_message(
+        "Remove only works in selected playlist views".to_string(),
+        4,
+      );
+      return;
+    }
+  };
+
+  let track = match app.track_table.tracks.get(app.track_table.selected_index) {
+    Some(track) => track,
+    None => return,
+  };
+
+  let track_id = match track.id.clone() {
+    Some(id) => id.into_static(),
+    None => {
+      app.set_status_message("Track cannot be edited in playlist".to_string(), 4);
+      return;
+    }
+  };
+  let track_name = track.name.clone();
+
+  let position = match app
+    .playlist_track_positions
+    .as_ref()
+    .and_then(|positions| positions.get(app.track_table.selected_index))
+    .copied()
+  {
+    Some(position) => position,
+    None => {
+      app.set_status_message("Cannot resolve track position for removal".to_string(), 4);
+      return;
+    }
+  };
+
+  app.dialog = None;
+  app.confirm = false;
+  app.clear_playlist_track_dialog_state();
+  app.pending_playlist_track_removal = Some(PendingPlaylistTrackRemoval {
+    playlist_id: playlist_context.0,
+    playlist_name: playlist_context.1,
+    track_id,
+    track_name,
+    position,
+  });
+  app.push_navigation_stack(
+    RouteId::Dialog,
+    ActiveBlock::Dialog(DialogContext::RemoveTrackFromPlaylistConfirm),
+  );
 }
 
 fn play_random_song(app: &mut App) {
@@ -524,6 +595,29 @@ fn active_playlist_id_static(app: &App) -> Option<PlaylistId<'static>> {
     .active_playlist_index
     .and_then(|idx| app.all_playlists.get(idx))
     .map(|playlist| playlist.id.clone().into_static())
+}
+
+fn active_playlist_target_for_track_table_context(
+  app: &App,
+) -> Option<(PlaylistId<'static>, String)> {
+  match app.track_table.context {
+    Some(TrackTableContext::MyPlaylists) => app
+      .active_playlist_index
+      .and_then(|idx| app.all_playlists.get(idx))
+      .map(|playlist| (playlist.id.clone().into_static(), playlist.name.clone())),
+    Some(TrackTableContext::PlaylistSearch) => app
+      .search_results
+      .selected_playlists_index
+      .and_then(|idx| {
+        app
+          .search_results
+          .playlists
+          .as_ref()
+          .and_then(|playlists| playlists.items.get(idx))
+      })
+      .map(|playlist| (playlist.id.clone().into_static(), playlist.name.clone())),
+    _ => None,
+  }
 }
 
 fn active_playlist_context_id(app: &App) -> Option<PlayContextId<'static>> {

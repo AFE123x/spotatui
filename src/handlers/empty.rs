@@ -55,6 +55,11 @@ pub fn handler(key: Key, app: &mut App) {
       _ => {}
     },
     k if common_key_events::right_event(k) => common_key_events::handle_right_event(app),
+    Key::Char('w') => {
+      if app.get_current_route().hovered_block == ActiveBlock::PlayBar {
+        super::playbar::handler(key, app);
+      }
+    }
     _ => (),
   };
 }
@@ -167,5 +172,18 @@ mod tests {
     let current_route = app.get_current_route();
     assert_eq!(current_route.active_block, ActiveBlock::Home);
     assert_eq!(current_route.hovered_block, ActiveBlock::Home);
+  }
+
+  #[test]
+  fn on_w_press_over_playbar_adds_current_track() {
+    let mut app = App::default();
+    app.set_current_route_state(Some(ActiveBlock::Empty), Some(ActiveBlock::PlayBar));
+
+    handler(Key::Char('w'), &mut app);
+
+    assert_eq!(
+      app.status_message.as_deref(),
+      Some("No track currently playing")
+    );
   }
 }

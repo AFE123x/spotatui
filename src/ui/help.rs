@@ -178,6 +178,26 @@ pub fn get_help_docs(key_bindings: &KeyBindings) -> Vec<Vec<String>> {
       String::from("Selected block"),
     ],
     vec![
+      String::from("Add selected track to playlist"),
+      String::from("w"),
+      String::from("Track table"),
+    ],
+    vec![
+      String::from("Add currently playing track to playlist"),
+      String::from("w"),
+      String::from("Playbar"),
+    ],
+    vec![
+      String::from("Quick-add currently playing track to playlist"),
+      String::from("W"),
+      String::from("Global"),
+    ],
+    vec![
+      String::from("Remove selected track from current playlist"),
+      String::from("x"),
+      String::from("Track table (playlist views)"),
+    ],
+    vec![
       String::from("Start playback or enter album/artist/playlist"),
       key_bindings.submit.to_string(),
       String::from("Selected block"),

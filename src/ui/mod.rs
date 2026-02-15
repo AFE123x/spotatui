@@ -4,8 +4,8 @@ pub mod settings;
 pub mod util;
 use super::{
   app::{
-    ActiveBlock, AlbumTableContext, App, ArtistBlock, EpisodeTableContext, RecommendationsContext,
-    RouteId, SearchResultBlock, LIBRARY_OPTIONS,
+    ActiveBlock, AlbumTableContext, App, ArtistBlock, DialogContext, EpisodeTableContext,
+    RecommendationsContext, RouteId, SearchResultBlock, LIBRARY_OPTIONS,
   },
   banner::BANNER,
 };
@@ -2341,79 +2341,184 @@ fn draw_selectable_list<S>(
 }
 
 fn draw_dialog(f: &mut Frame<'_>, app: &App) {
-  if let ActiveBlock::Dialog(_) = app.get_current_route().active_block {
-    if let Some(playlist) = app.dialog.as_ref() {
-      let bounds = f.area();
-      // maybe do this better
-      let width = std::cmp::min(bounds.width - 2, 45);
-      let height = 8;
-      let left = (bounds.width - width) / 2;
-      let top = bounds.height / 4;
+  let dialog_context = match app.get_current_route().active_block {
+    ActiveBlock::Dialog(context) => context,
+    _ => return,
+  };
 
-      let rect = Rect::new(left, top, width, height);
-
-      f.render_widget(Clear, rect);
-
-      let block = Block::default()
-        .borders(Borders::ALL)
-        .style(app.user_config.theme.base_style())
-        .border_style(Style::default().fg(app.user_config.theme.inactive));
-
-      f.render_widget(block, rect);
-
-      let vchunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints([Constraint::Min(3), Constraint::Length(3)].as_ref())
-        .split(rect);
-
-      // suggestion: possibly put this as part of
-      // app.dialog, but would have to introduce lifetime
-      let text = vec![
-        Line::from(Span::raw("Are you sure you want to delete the playlist: ")),
-        Line::from(Span::styled(
-          playlist.as_str(),
-          Style::default().add_modifier(Modifier::BOLD),
-        )),
-        Line::from(Span::raw("?")),
-      ];
-
-      let text = Paragraph::new(text)
-        .wrap(Wrap { trim: true })
-        .style(app.user_config.theme.base_style())
-        .alignment(Alignment::Center);
-
-      f.render_widget(text, vchunks[0]);
-
-      let hchunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .horizontal_margin(3)
-        .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)].as_ref())
-        .split(vchunks[1]);
-
-      let ok_text = Span::raw("Ok");
-      let ok = Paragraph::new(ok_text)
-        .style(Style::default().fg(if app.confirm {
-          app.user_config.theme.hovered
-        } else {
-          app.user_config.theme.inactive
-        }))
-        .alignment(Alignment::Center);
-
-      f.render_widget(ok, hchunks[0]);
-
-      let cancel_text = Span::raw("Cancel");
-      let cancel = Paragraph::new(cancel_text)
-        .style(Style::default().fg(if app.confirm {
-          app.user_config.theme.inactive
-        } else {
-          app.user_config.theme.hovered
-        }))
-        .alignment(Alignment::Center);
-
-      f.render_widget(cancel, hchunks[1]);
+  match dialog_context {
+    DialogContext::PlaylistWindow | DialogContext::PlaylistSearch => {
+      if let Some(playlist) = app.dialog.as_ref() {
+        let text = vec![
+          Line::from(Span::raw("Are you sure you want to delete the playlist: ")),
+          Line::from(Span::styled(
+            playlist.as_str(),
+            Style::default().add_modifier(Modifier::BOLD),
+          )),
+          Line::from(Span::raw("?")),
+        ];
+        draw_confirmation_dialog(f, app, "Confirm", text, 45);
+      }
+    }
+    DialogContext::RemoveTrackFromPlaylistConfirm => {
+      if let Some(pending_remove) = app.pending_playlist_track_removal.as_ref() {
+        let text = vec![
+          Line::from(Span::raw("Remove this track from playlist?")),
+          Line::from(Span::styled(
+            format!("Track: {}", pending_remove.track_name),
+            Style::default().add_modifier(Modifier::BOLD),
+          )),
+          Line::from(Span::styled(
+            format!("Playlist: {}", pending_remove.playlist_name),
+            Style::default().add_modifier(Modifier::BOLD),
+          )),
+        ];
+        draw_confirmation_dialog(f, app, "Remove Track", text, 60);
+      }
+    }
+    DialogContext::AddTrackToPlaylistPicker => {
+      draw_add_track_to_playlist_picker_dialog(f, app);
     }
   }
+}
+
+fn centered_modal_rect(bounds: Rect, requested_width: u16, requested_height: u16) -> Rect {
+  let width = requested_width.min(bounds.width.saturating_sub(2).max(1));
+  let height = requested_height.min(bounds.height.saturating_sub(2).max(1));
+  let left = bounds.x + bounds.width.saturating_sub(width) / 2;
+  let top = bounds.y + bounds.height.saturating_sub(height) / 3;
+  Rect::new(left, top, width, height)
+}
+
+fn draw_confirmation_dialog(
+  f: &mut Frame<'_>,
+  app: &App,
+  title: &str,
+  text: Vec<Line<'_>>,
+  requested_width: u16,
+) {
+  let rect = centered_modal_rect(f.area(), requested_width, 10);
+  f.render_widget(Clear, rect);
+
+  let block = Block::default()
+    .title(Span::styled(
+      title,
+      Style::default()
+        .fg(app.user_config.theme.header)
+        .add_modifier(Modifier::BOLD),
+    ))
+    .borders(Borders::ALL)
+    .style(app.user_config.theme.base_style())
+    .border_style(Style::default().fg(app.user_config.theme.inactive));
+  f.render_widget(block, rect);
+
+  let vchunks = Layout::default()
+    .direction(Direction::Vertical)
+    .margin(1)
+    .constraints([Constraint::Min(3), Constraint::Length(3)].as_ref())
+    .split(rect);
+
+  let text = Paragraph::new(text)
+    .wrap(Wrap { trim: true })
+    .style(app.user_config.theme.base_style())
+    .alignment(Alignment::Center);
+  f.render_widget(text, vchunks[0]);
+
+  let hchunks = Layout::default()
+    .direction(Direction::Horizontal)
+    .horizontal_margin(3)
+    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)].as_ref())
+    .split(vchunks[1]);
+
+  let ok = Paragraph::new(Span::raw("Ok"))
+    .style(Style::default().fg(if app.confirm {
+      app.user_config.theme.hovered
+    } else {
+      app.user_config.theme.inactive
+    }))
+    .alignment(Alignment::Center);
+  f.render_widget(ok, hchunks[0]);
+
+  let cancel = Paragraph::new(Span::raw("Cancel"))
+    .style(Style::default().fg(if app.confirm {
+      app.user_config.theme.inactive
+    } else {
+      app.user_config.theme.hovered
+    }))
+    .alignment(Alignment::Center);
+  f.render_widget(cancel, hchunks[1]);
+}
+
+fn draw_add_track_to_playlist_picker_dialog(f: &mut Frame<'_>, app: &App) {
+  let rect = centered_modal_rect(f.area(), 70, 20);
+  f.render_widget(Clear, rect);
+
+  let block = Block::default()
+    .title(Span::styled(
+      "Add Track To Playlist",
+      Style::default()
+        .fg(app.user_config.theme.header)
+        .add_modifier(Modifier::BOLD),
+    ))
+    .borders(Borders::ALL)
+    .style(app.user_config.theme.base_style())
+    .border_style(Style::default().fg(app.user_config.theme.inactive));
+  f.render_widget(block, rect);
+
+  let vchunks = Layout::default()
+    .direction(Direction::Vertical)
+    .margin(1)
+    .constraints([
+      Constraint::Length(2),
+      Constraint::Min(3),
+      Constraint::Length(1),
+    ])
+    .split(rect);
+
+  let track_name = app
+    .pending_playlist_track_add
+    .as_ref()
+    .map(|p| p.track_name.as_str())
+    .unwrap_or("Selected track");
+
+  let header = Paragraph::new(Line::from(Span::raw(format!(
+    "Choose a playlist for: {}",
+    track_name
+  ))))
+  .wrap(Wrap { trim: true })
+  .style(app.user_config.theme.base_style());
+  f.render_widget(header, vchunks[0]);
+
+  let mut list_state = ListState::default();
+
+  if app.all_playlists.is_empty() {
+    let empty_text = Paragraph::new("No playlists available")
+      .style(Style::default().fg(app.user_config.theme.inactive))
+      .alignment(Alignment::Center);
+    f.render_widget(empty_text, vchunks[1]);
+  } else {
+    let items: Vec<ListItem> = app
+      .all_playlists
+      .iter()
+      .map(|playlist| ListItem::new(Span::raw(playlist.name.as_str())))
+      .collect();
+    let selected = app
+      .playlist_picker_selected_index
+      .min(app.all_playlists.len() - 1);
+    list_state.select(Some(selected));
+
+    let list = List::new(items)
+      .style(app.user_config.theme.base_style())
+      .highlight_style(Style::default().fg(app.user_config.theme.hovered))
+      .highlight_symbol("▶ ");
+
+    f.render_stateful_widget(list, vchunks[1], &mut list_state);
+  }
+
+  let footer = Paragraph::new("Enter add | q cancel | j/k or arrows move | H/M/L jump")
+    .style(Style::default().fg(app.user_config.theme.inactive))
+    .alignment(Alignment::Center);
+  f.render_widget(footer, vchunks[2]);
 }
 
 fn draw_table(

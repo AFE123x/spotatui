@@ -11,7 +11,7 @@ use rspotify::{
     artist::FullArtist,
     context::CurrentPlaybackContext,
     device::DevicePayload,
-    idtypes::{ArtistId, ShowId, TrackId},
+    idtypes::{ArtistId, PlaylistId, ShowId, TrackId},
     page::{CursorBasedPage, Page},
     playing::PlayHistory,
     playlist::{PlaylistItem, SimplifiedPlaylist},
@@ -29,7 +29,7 @@ use std::sync::Arc;
 use std::{
   cmp::{max, min},
   collections::HashSet,
-  time::{Instant, SystemTime},
+  time::{Duration, Instant, SystemTime},
 };
 
 use arboard::Clipboard;
@@ -120,6 +120,8 @@ pub enum ArtistBlock {
 pub enum DialogContext {
   PlaylistWindow,
   PlaylistSearch,
+  AddTrackToPlaylistPicker,
+  RemoveTrackFromPlaylistConfirm,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -270,6 +272,21 @@ pub struct TrackTable {
   pub tracks: Vec<FullTrack>,
   pub selected_index: usize,
   pub context: Option<TrackTableContext>,
+}
+
+#[derive(Clone)]
+pub struct PendingPlaylistTrackAdd {
+  pub track_id: TrackId<'static>,
+  pub track_name: String,
+}
+
+#[derive(Clone)]
+pub struct PendingPlaylistTrackRemoval {
+  pub playlist_id: PlaylistId<'static>,
+  pub playlist_name: String,
+  pub track_id: TrackId<'static>,
+  pub track_name: String,
+  pub position: usize,
 }
 
 #[derive(Clone)]
@@ -590,6 +607,15 @@ pub struct App {
   pub status_message_expires_at: Option<Instant>,
   /// Pending track table selection to apply when new page loads
   pub pending_track_table_selection: Option<PendingTrackSelection>,
+  /// Maps visible track table rows to source playlist item positions.
+  /// Used to remove a single selected playlist occurrence safely.
+  pub playlist_track_positions: Option<Vec<usize>>,
+  /// Selected playlist index in the add-to-playlist picker dialog
+  pub playlist_picker_selected_index: usize,
+  /// Pending track to add in add-to-playlist dialog flow
+  pub pending_playlist_track_add: Option<PendingPlaylistTrackAdd>,
+  /// Pending track removal info in remove-from-playlist confirmation flow
+  pub pending_playlist_track_removal: Option<PendingPlaylistTrackRemoval>,
   /// Full flat list of all user playlists (all pages combined)
   pub all_playlists: Vec<SimplifiedPlaylist>,
   /// Folder tree from rootlist (None if not fetched or streaming disabled)
@@ -738,6 +764,10 @@ impl Default for App {
       status_message: None,
       status_message_expires_at: None,
       pending_track_table_selection: None,
+      playlist_track_positions: None,
+      playlist_picker_selected_index: 0,
+      pending_playlist_track_add: None,
+      pending_playlist_track_removal: None,
       all_playlists: Vec::new(),
       playlist_folder_nodes: None,
       playlist_folder_items: Vec::new(),
@@ -781,6 +811,50 @@ impl App {
   // Close the IO channel to allow the network thread to exit gracefully
   pub fn close_io_channel(&mut self) {
     self.io_tx = None;
+  }
+
+  pub fn clear_playlist_track_dialog_state(&mut self) {
+    self.pending_playlist_track_add = None;
+    self.pending_playlist_track_removal = None;
+    self.playlist_picker_selected_index = 0;
+  }
+
+  pub fn set_status_message(&mut self, message: impl Into<String>, ttl_secs: u64) {
+    self.status_message = Some(message.into());
+    self.status_message_expires_at = Some(Instant::now() + Duration::from_secs(ttl_secs));
+  }
+
+  pub fn begin_add_track_to_playlist_flow(
+    &mut self,
+    track_id: Option<TrackId<'static>>,
+    track_name: String,
+  ) {
+    let Some(track_id) = track_id else {
+      self.set_status_message("Track cannot be edited in playlist".to_string(), 4);
+      return;
+    };
+
+    if self.all_playlists.is_empty() {
+      if self.playlists.is_none() {
+        self.dispatch(IoEvent::GetPlaylists);
+        self.set_status_message("Playlists loading, try again".to_string(), 4);
+      } else {
+        self.set_status_message("No playlists available".to_string(), 4);
+      }
+      return;
+    }
+
+    self.dialog = None;
+    self.confirm = false;
+    self.clear_playlist_track_dialog_state();
+    self.pending_playlist_track_add = Some(PendingPlaylistTrackAdd {
+      track_id,
+      track_name,
+    });
+    self.push_navigation_stack(
+      RouteId::Dialog,
+      ActiveBlock::Dialog(DialogContext::AddTrackToPlaylistPicker),
+    );
   }
 
   pub fn is_playlist_item_visible_in_current_folder(&self, item: &PlaylistFolderItem) -> bool {
