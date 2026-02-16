@@ -75,7 +75,7 @@ use std::{
   fs,
   io::{self, stdout, Write},
   panic,
-  path::PathBuf,
+  path::{Path, PathBuf},
   sync::{atomic::AtomicU64, Arc},
   time::SystemTime,
 };
@@ -353,7 +353,7 @@ async fn load_token_from_file(spotify: &AuthCodePkceSpotify, path: &PathBuf) -> 
   Ok(true)
 }
 
-fn token_cache_path_for_client(base_path: &PathBuf, client_id: &str) -> PathBuf {
+fn token_cache_path_for_client(base_path: &Path, client_id: &str) -> PathBuf {
   let suffix = &client_id[..8.min(client_id.len())];
   let stem = base_path
     .file_stem()

@@ -641,13 +641,15 @@ impl Network {
           items.retain(|item| !item.is_null());
         }
 
-        if map.contains_key("snapshot_id") && map.contains_key("owner") && map.contains_key("id") {
-          if !map.contains_key("tracks") {
-            if let Some(items_obj) = map.get("items").cloned() {
-              map.insert("tracks".to_string(), items_obj);
-            } else {
-              map.insert("tracks".to_string(), json!({ "href": "", "total": 0 }));
-            }
+        if map.contains_key("snapshot_id")
+          && map.contains_key("owner")
+          && map.contains_key("id")
+          && !map.contains_key("tracks")
+        {
+          if let Some(items_obj) = map.get("items").cloned() {
+            map.insert("tracks".to_string(), items_obj);
+          } else {
+            map.insert("tracks".to_string(), json!({ "href": "", "total": 0 }));
           }
         }
 
@@ -3238,13 +3240,15 @@ impl Network {
           spotify,
           app,
           limit,
-          first_page_count,
-          total,
-          first_page_items,
-          refresh_generation,
-          preferred_playlist_id,
-          preferred_folder_id,
-          preferred_selected_index,
+          (
+            first_page_count,
+            total,
+            first_page_items,
+            refresh_generation,
+            preferred_playlist_id,
+            preferred_folder_id,
+            preferred_selected_index,
+          ),
           streaming_player,
         )
         .await;
@@ -3257,13 +3261,15 @@ impl Network {
           spotify,
           app,
           limit,
-          first_page_count,
-          total,
-          first_page_items,
-          refresh_generation,
-          preferred_playlist_id,
-          preferred_folder_id,
-          preferred_selected_index,
+          (
+            first_page_count,
+            total,
+            first_page_items,
+            refresh_generation,
+            preferred_playlist_id,
+            preferred_folder_id,
+            preferred_selected_index,
+          ),
         )
         .await;
       });
@@ -3276,15 +3282,27 @@ impl Network {
     spotify: AuthCodePkceSpotify,
     app: Arc<Mutex<App>>,
     limit: u32,
-    first_page_count: u32,
-    total: u32,
-    mut all_playlists: Vec<rspotify::model::playlist::SimplifiedPlaylist>,
-    refresh_generation: u64,
-    preferred_playlist_id: Option<String>,
-    preferred_folder_id: usize,
-    preferred_selected_index: Option<usize>,
+    task_state: (
+      u32,
+      u32,
+      Vec<rspotify::model::playlist::SimplifiedPlaylist>,
+      u64,
+      Option<String>,
+      usize,
+      Option<usize>,
+    ),
     #[cfg(feature = "streaming")] streaming_player: Option<Arc<StreamingPlayer>>,
   ) {
+    let (
+      first_page_count,
+      total,
+      mut all_playlists,
+      refresh_generation,
+      preferred_playlist_id,
+      preferred_folder_id,
+      preferred_selected_index,
+    ) = task_state;
+
     let max_playlists: u32 = 10_000;
 
     // Streaming: spawn remaining pages fetch concurrently, await rootlist first
