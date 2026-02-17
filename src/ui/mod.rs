@@ -1670,7 +1670,8 @@ fn build_changelog_lines(
 
   lines.push(Line::from(Span::styled(
     format!(
-      "Log located in /tmp/spotatui_logs/spotatuilog{}",
+      "Log located in {}spotatui_logs/spotatuilog{}",
+      std::env::temp_dir().display(),
       std::process::id()
     ),
     Style::default().fg(theme.hint),
