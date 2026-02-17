@@ -283,7 +283,10 @@ impl Network {
         self.get_current_user_saved_tracks(offset).await;
       }
       IoEvent::StartPlayback(context_uri, uris, offset) => {
-        info!("Starting playback with context_uri={:?}, uris={:?}, offset={:?}", context_uri, uris, offset);
+        info!(
+          "Starting playback with context_uri={:?}, uris={:?}, offset={:?}",
+          context_uri, uris, offset
+        );
         self.start_playback(context_uri, uris, offset).await;
       }
       IoEvent::UpdateSearchLimits(large_search_limit, small_search_limit) => {
@@ -1420,12 +1423,13 @@ impl Network {
     uris: Option<Vec<PlayableId<'_>>>,
     offset: Option<usize>,
   ) {
-    info!("start_playback called: context_id={}, uris.len={}, offset={:?}",
+    info!(
+      "start_playback called: context_id={}, uris.len={}, offset={:?}",
       context_id.is_some(),
       uris.as_ref().map(|u| u.len()).unwrap_or(0),
       offset
     );
-  
+
     // Check if we should use native streaming for playback
     #[cfg(feature = "streaming")]
     if self.is_native_streaming_active_for_playback().await {
@@ -1587,7 +1591,10 @@ impl Network {
       // This ensures the selected track plays first, even with shuffle enabled
       let context = context_id.unwrap();
       let track_uris = uris.unwrap();
-      info!("Starting context playback with {} track(s)", track_uris.len());
+      info!(
+        "Starting context playback with {} track(s)",
+        track_uris.len()
+      );
 
       if let Some(first_uri) = track_uris.first() {
         let offset = rspotify::model::Offset::Uri(first_uri.uri());
