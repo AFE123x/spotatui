@@ -7,6 +7,7 @@ use crate::config::ClientConfig;
 use crate::ui::util::create_artist_string;
 use anyhow::anyhow;
 use chrono::TimeDelta;
+use log::info;
 use reqwest::Method;
 use rspotify::{
   model::{
@@ -282,6 +283,7 @@ impl Network {
         self.get_current_user_saved_tracks(offset).await;
       }
       IoEvent::StartPlayback(context_uri, uris, offset) => {
+        info!("Starting playback with context_uri={:?}, uris={:?}, offset={:?}", context_uri, uris, offset);
         self.start_playback(context_uri, uris, offset).await;
       }
       IoEvent::UpdateSearchLimits(large_search_limit, small_search_limit) => {
@@ -1418,10 +1420,17 @@ impl Network {
     uris: Option<Vec<PlayableId<'_>>>,
     offset: Option<usize>,
   ) {
+    info!("start_playback called: context_id={}, uris.len={}, offset={:?}",
+      context_id.is_some(),
+      uris.as_ref().map(|u| u.len()).unwrap_or(0),
+      offset
+    );
+  
     // Check if we should use native streaming for playback
     #[cfg(feature = "streaming")]
     if self.is_native_streaming_active_for_playback().await {
       if let Some(ref player) = self.streaming_player {
+        info!("Using native streaming player for playback");
         let activation_time = Instant::now();
         let should_transfer = {
           let app = self.app.lock().await;
@@ -1437,6 +1446,7 @@ impl Network {
         };
 
         if should_transfer {
+          info!("Transferring playback to native streaming device");
           let _ = player.transfer(None);
         }
 
@@ -1450,6 +1460,7 @@ impl Network {
 
         // For resume playback (no context, no uris)
         if context_id.is_none() && uris.is_none() {
+          info!("Resuming playback via native player");
           player.play();
           // Update UI state immediately
           let mut app = self.app.lock().await;
@@ -1501,8 +1512,10 @@ impl Network {
           }
         };
 
+        info!("Loading playback via native player Spirc");
         match player.load(request) {
           Ok(()) => {
+            info!("Successfully loaded playback via native player");
             // Best-effort: ensure we end up playing (some Connect flows load paused).
             player.play();
 
@@ -1515,6 +1528,7 @@ impl Network {
             }
           }
           Err(e) => {
+            log::error!("Failed to load playback via native player: {:?}", e);
             self.handle_error(e).await;
           }
         }
@@ -1522,6 +1536,9 @@ impl Network {
         return;
       }
     }
+
+    // Using Web API for playback (native streaming not active)
+    info!("Using Spotify Web API for playback");
 
     // If Spotify reports a current playback context, target the active device by omitting
     // `device_id` (more robust when the user switches devices outside spotatui).
@@ -1570,6 +1587,7 @@ impl Network {
       // This ensures the selected track plays first, even with shuffle enabled
       let context = context_id.unwrap();
       let track_uris = uris.unwrap();
+      info!("Starting context playback with {} track(s)", track_uris.len());
 
       if let Some(first_uri) = track_uris.first() {
         let offset = rspotify::model::Offset::Uri(first_uri.uri());
@@ -1585,6 +1603,7 @@ impl Network {
       }
     } else if let Some(context_id) = context_id {
       // Play from context, optionally starting at an offset within the context.
+      info!("Starting context playback with offset: {:?}", offset);
       let offset = offset
         .and_then(|i| i64::try_from(i).ok())
         .map(|i| rspotify::model::Offset::Position(chrono::Duration::milliseconds(i)));
@@ -1595,6 +1614,7 @@ impl Network {
     } else if let Some(mut uris) = uris {
       // For URI-based playback, reorder the list to put the selected track first
       // This ensures the user's selected track plays first, regardless of shuffle mode
+      info!("Starting URI-based playback with {} track(s)", uris.len());
       if let Some(offset_pos) = offset {
         if offset_pos < uris.len() && offset_pos > 0 {
           // Move the track at offset_pos to the front
@@ -1609,9 +1629,11 @@ impl Network {
         .await
     } else {
       // Resume playback - use native player if available for instant response
+      info!("Resuming playback via Web API");
       #[cfg(feature = "streaming")]
       if self.is_native_streaming_active_for_playback().await {
         if let Some(ref player) = self.streaming_player {
+          info!("Native player is active, resuming playback directly");
           player.play();
           // Update UI state immediately
           let mut app = self.app.lock().await;
@@ -1626,6 +1648,7 @@ impl Network {
 
     match result {
       Ok(()) => {
+        info!("Playback started successfully via Web API");
         // Re-enable shuffle if it was on before
         if should_disable_shuffle && original_shuffle_state && !is_native {
           // Small delay to let playback start before re-enabling shuffle
@@ -1650,9 +1673,11 @@ impl Network {
         self.get_current_playback().await;
       }
       Err(e) => {
+        log::error!("Web API playback request failed: {:?}", e);
         // For native streaming, if the API fails (404), try using native player directly
         #[cfg(feature = "streaming")]
         if is_native {
+          log::warn!("API failed, attempting fallback to native player");
           if let Some(ref player) = self.streaming_player {
             // Activate and play - the Spirc will handle the actual playback
             player.activate();
