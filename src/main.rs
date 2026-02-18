@@ -509,12 +509,12 @@ fn setup_logging() -> anyhow::Result<()> {
   let pid = std::process::id();
 
   // Construct the log file path using the PID
-  let log_dir = "/tmp/spotatui_logs/";
+  let log_dir = format!("{}spotatui_logs/", std::env::temp_dir().display());
   let log_path = format!("{}spotatuilog{}", log_dir, pid);
 
   // Ensure the directory exists. If not, create.
-  if !std::path::Path::new(log_dir).exists() {
-    std::fs::create_dir_all(log_dir)
+  if !std::path::Path::new(&log_dir).exists() {
+    std::fs::create_dir_all(&log_dir)
       .map_err(|e| anyhow::anyhow!("Failed to create log directory {}: {}", log_dir, e))?;
   }
   // define format of log messages.
