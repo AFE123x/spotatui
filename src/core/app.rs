@@ -127,6 +127,7 @@ pub enum DialogContext {
   PersistKeybindingFallback,
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum CapabilityState {
   #[default]
@@ -142,6 +143,7 @@ pub struct TerminalInputCapabilities {
   pub ctrl_punct_reliable: CapabilityState,
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum KeyFallbackReason {
   CtrlCommaNotReported,
@@ -151,7 +153,9 @@ pub enum KeyFallbackReason {
 pub struct KeybindingRuntimeState {
   pub effective_open_settings: Option<Key>,
   pub fallback_reason: Option<KeyFallbackReason>,
+  #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
   pub fallback_notice_shown: bool,
+  #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
   pub persist_prompt_shown: bool,
 }
 
