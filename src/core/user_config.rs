@@ -615,6 +615,9 @@ pub struct BehaviorConfigString {
   pub dismissed_announcements: Option<Vec<String>>,
   pub relay_server_url: Option<String>,
   pub stop_after_current_track: Option<bool>,
+  pub sidebar_width_percent: Option<u8>,
+  pub playbar_height_rows: Option<u16>,
+  pub library_height_percent: Option<u8>,
   #[cfg(feature = "cover-art")]
   pub draw_cover_art: Option<bool>,
   #[cfg(feature = "cover-art")]
@@ -648,6 +651,9 @@ pub struct BehaviorConfig {
   pub dismissed_announcements: Vec<String>,
   pub relay_server_url: String,
   pub stop_after_current_track: bool,
+  pub sidebar_width_percent: u8,
+  pub playbar_height_rows: u16,
+  pub library_height_percent: u8,
   #[cfg(feature = "cover-art")]
   pub draw_cover_art: bool,
   #[cfg(feature = "cover-art")]
@@ -743,6 +749,9 @@ impl UserConfig {
         dismissed_announcements: Vec::new(),
         relay_server_url: "wss://spotatui-party.spotatui.workers.dev/ws".to_string(),
         stop_after_current_track: false,
+        sidebar_width_percent: 20,
+        playbar_height_rows: 6,
+        library_height_percent: 30,
         #[cfg(feature = "cover-art")]
         draw_cover_art: true,
         #[cfg(feature = "cover-art")]
@@ -977,6 +986,18 @@ impl UserConfig {
       self.behavior.stop_after_current_track = stop_after_current_track;
     }
 
+    if let Some(sidebar_width_percent) = behavior_config.sidebar_width_percent {
+      self.behavior.sidebar_width_percent = sidebar_width_percent.min(100);
+    }
+
+    if let Some(playbar_height_rows) = behavior_config.playbar_height_rows {
+      self.behavior.playbar_height_rows = playbar_height_rows;
+    }
+
+    if let Some(library_height_percent) = behavior_config.library_height_percent {
+      self.behavior.library_height_percent = library_height_percent.min(100);
+    }
+
     #[cfg(feature = "cover-art")]
     if let Some(draw_cover_art) = behavior_config.draw_cover_art {
       self.behavior.draw_cover_art = draw_cover_art;
@@ -1058,6 +1079,9 @@ impl UserConfig {
       dismissed_announcements: Some(self.behavior.dismissed_announcements.clone()),
       relay_server_url: Some(self.behavior.relay_server_url.clone()),
       stop_after_current_track: Some(self.behavior.stop_after_current_track),
+      sidebar_width_percent: Some(self.behavior.sidebar_width_percent),
+      playbar_height_rows: Some(self.behavior.playbar_height_rows),
+      library_height_percent: Some(self.behavior.library_height_percent),
       #[cfg(feature = "cover-art")]
       draw_cover_art: Some(self.behavior.draw_cover_art),
       #[cfg(feature = "cover-art")]

@@ -22,6 +22,7 @@ mod playlist;
 mod podcasts;
 mod queue_menu;
 mod recently_played;
+pub mod resize;
 mod search_results;
 mod select_device;
 mod settings;
@@ -167,18 +168,71 @@ pub fn handle_app(key: Key, app: &mut App) {
     _ if key == app.user_config.keys.listening_party => {
       app.push_navigation_stack(RouteId::Party, ActiveBlock::Party);
     }
-    Key::Char('W') => match app.get_current_route().active_block {
-      ActiveBlock::Input
+    // Resize sidebar: { decreases, } increases width
+    Key::Char('{') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        resize::decrease_sidebar_width(app);
+      }
+    }
+    Key::Char('}') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        resize::increase_sidebar_width(app);
+      }
+    }
+    // Resize playbar or library/playlist split depending on hovered pane:
+    // ( decreases height, ) increases height
+    Key::Char('(') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        match app.get_current_route().hovered_block {
+          ActiveBlock::Library | ActiveBlock::MyPlaylists => resize::decrease_library_height(app),
+          _ => resize::decrease_playbar_height(app),
+        }
+      }
+    }
+    Key::Char(')') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        match app.get_current_route().hovered_block {
+          ActiveBlock::Library | ActiveBlock::MyPlaylists => resize::increase_library_height(app),
+          _ => resize::increase_playbar_height(app),
+        }
+      }
+    }
+    // Reset all pane sizes to defaults
+    Key::Char('|') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        resize::reset_layout(app);
+      }
+    }
+    Key::Char('W') => {
+      if is_input_mode(app) {
+        handle_block_events(key, app);
+      } else {
+        playbar::add_currently_playing_track_to_playlist(app);
+      }
+    }
+    _ => handle_block_events(key, app),
+  }
+}
+
+fn is_input_mode(app: &App) -> bool {
+  matches!(
+    app.get_current_route().active_block,
+    ActiveBlock::Input
       | ActiveBlock::Dialog(_)
       | ActiveBlock::UpdatePrompt
       | ActiveBlock::AnnouncementPrompt
-      | ActiveBlock::ExitPrompt => {
-        handle_block_events(key, app);
-      }
-      _ => playbar::add_currently_playing_track_to_playlist(app),
-    },
-    _ => handle_block_events(key, app),
-  }
+      | ActiveBlock::ExitPrompt
+  )
 }
 
 // Handle event for the current active block
@@ -378,6 +432,7 @@ fn handle_jump_to_artist_album(app: &mut App) {
 #[cfg(test)]
 mod tests {
   use super::*;
+  #[cfg(target_os = "macos")]
   use crate::core::app::TrackTableContext;
 
   #[test]

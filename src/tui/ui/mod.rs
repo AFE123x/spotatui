@@ -12,6 +12,7 @@ pub mod tables;
 pub mod util;
 
 use crate::core::app::{App, RouteId};
+use crate::core::layout::{playbar_constraint, sidebar_constraints};
 use ratatui::{
   layout::{Constraint, Layout, Rect},
   Frame,
@@ -37,9 +38,13 @@ pub fn draw_main_layout(f: &mut Frame<'_>, app: &App) {
   let margin = get_main_layout_margin(app);
   // Responsive layout: new one kicks in at width 150 or higher
   if app.size.width >= SMALL_TERMINAL_WIDTH && !app.user_config.behavior.enforce_wide_search_bar {
-    let [routes_area, playbar_area] = f
-      .area()
-      .layout(&Layout::vertical([Constraint::Min(1), Constraint::Length(6)]).margin(margin));
+    let [routes_area, playbar_area] = f.area().layout(
+      &Layout::vertical([
+        Constraint::Min(1),
+        playbar_constraint(&app.user_config.behavior),
+      ])
+      .margin(margin),
+    );
 
     // Nested main block with potential routes
     draw_routes(f, app, routes_area);
@@ -51,7 +56,7 @@ pub fn draw_main_layout(f: &mut Frame<'_>, app: &App) {
       &Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(1),
-        Constraint::Length(6),
+        playbar_constraint(&app.user_config.behavior),
       ])
       .margin(margin),
     );
@@ -74,10 +79,9 @@ pub fn draw_main_layout(f: &mut Frame<'_>, app: &App) {
 }
 
 pub fn draw_routes(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
-  let [user_area, content_area] = layout_chunk.layout(&Layout::horizontal([
-    Constraint::Percentage(20),
-    Constraint::Percentage(80),
-  ]));
+  let [user_area, content_area] = layout_chunk.layout(&Layout::horizontal(sidebar_constraints(
+    &app.user_config.behavior,
+  )));
 
   draw_user_block(f, app, user_area);
 

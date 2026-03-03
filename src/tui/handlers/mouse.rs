@@ -2,6 +2,7 @@ use super::{library, playlist, settings, track_table};
 use crate::core::app::{
   ActiveBlock, App, RouteId, SettingValue, SettingsCategory, LIBRARY_OPTIONS,
 };
+use crate::core::layout::{library_constraints, playbar_constraint, sidebar_constraints};
 use crate::tui::event::Key;
 use crate::tui::ui::util::{get_main_layout_margin, SMALL_TERMINAL_WIDTH};
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
@@ -657,31 +658,31 @@ fn main_layout_areas(app: &App) -> Option<MainLayoutAreas> {
   let wide_layout =
     app.size.width >= SMALL_TERMINAL_WIDTH && !app.user_config.behavior.enforce_wide_search_bar;
 
+  let behavior = &app.user_config.behavior;
+  let playbar = playbar_constraint(behavior);
+  let sidebar = sidebar_constraints(behavior);
+  let library = library_constraints(behavior);
+
   let routes_area = if wide_layout {
     let [routes_area, _playbar_area] =
-      root.layout(&Layout::vertical([Constraint::Min(1), Constraint::Length(6)]).margin(margin));
+      root.layout(&Layout::vertical([Constraint::Min(1), playbar.clone()]).margin(margin));
     routes_area
   } else {
     let [input_area, routes_area, _playbar_area] = root.layout(
       &Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(1),
-        Constraint::Length(6),
+        playbar.clone(),
       ])
       .margin(margin),
     );
     let [input_text_area, help_area, settings_area] =
       split_input_help_and_settings(app, input_area);
 
-    let [library_area, playlist_area] =
-      user_area_for_routes(routes_area).layout(&Layout::vertical([
-        Constraint::Percentage(30),
-        Constraint::Percentage(70),
-      ]));
-    let [_user_area, content_area] = routes_area.layout(&Layout::horizontal([
-      Constraint::Percentage(20),
-      Constraint::Percentage(80),
-    ]));
+    let [library_area, playlist_area] = user_area_for_routes(routes_area)
+      .layout(&Layout::vertical([library[0].clone(), library[1].clone()]));
+    let [_user_area, content_area] =
+      routes_area.layout(&Layout::horizontal([sidebar[0].clone(), sidebar[1].clone()]));
 
     return Some(MainLayoutAreas {
       input: Some(input_text_area),
@@ -693,16 +694,14 @@ fn main_layout_areas(app: &App) -> Option<MainLayoutAreas> {
     });
   };
 
-  let [user_area, content_area] = routes_area.layout(&Layout::horizontal([
-    Constraint::Percentage(20),
-    Constraint::Percentage(80),
-  ]));
+  let [user_area, content_area] =
+    routes_area.layout(&Layout::horizontal([sidebar[0].clone(), sidebar[1].clone()]));
 
   if wide_layout {
     let [input_area, library_area, playlist_area] = user_area.layout(&Layout::vertical([
       Constraint::Length(3),
-      Constraint::Percentage(30),
-      Constraint::Percentage(70),
+      library[0].clone(),
+      library[1].clone(),
     ]));
     let [input_text_area, help_area, settings_area] =
       split_input_help_and_settings(app, input_area);
@@ -715,10 +714,8 @@ fn main_layout_areas(app: &App) -> Option<MainLayoutAreas> {
       content: content_area,
     })
   } else {
-    let [library_area, playlist_area] = user_area.layout(&Layout::vertical([
-      Constraint::Percentage(30),
-      Constraint::Percentage(70),
-    ]));
+    let [library_area, playlist_area] =
+      user_area.layout(&Layout::vertical([library[0].clone(), library[1].clone()]));
     Some(MainLayoutAreas {
       input: None,
       help: None,

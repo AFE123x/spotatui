@@ -1,4 +1,5 @@
 use crate::core::app::{ActiveBlock, App, LIBRARY_OPTIONS};
+use crate::core::layout::library_constraints;
 use ratatui::{
   layout::{Constraint, Layout, Rect},
   Frame,
@@ -77,10 +78,11 @@ pub fn draw_playlist_block(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
 pub fn draw_user_block(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
   // Check for width to make a responsive layout
   if app.size.width >= SMALL_TERMINAL_WIDTH && !app.user_config.behavior.enforce_wide_search_bar {
+    let lib_constraints = library_constraints(&app.user_config.behavior);
     let [input_area, library_area, playlist_area] = layout_chunk.layout(&Layout::vertical([
       Constraint::Length(3),
-      Constraint::Percentage(30),
-      Constraint::Percentage(70),
+      lib_constraints[0],
+      lib_constraints[1],
     ]));
 
     // Search input and help
@@ -88,10 +90,9 @@ pub fn draw_user_block(f: &mut Frame<'_>, app: &App, layout_chunk: Rect) {
     draw_library_block(f, app, library_area);
     draw_playlist_block(f, app, playlist_area);
   } else {
-    let [library_area, playlist_area] = layout_chunk.layout(&Layout::vertical([
-      Constraint::Percentage(30),
-      Constraint::Percentage(70),
-    ]));
+    let [library_area, playlist_area] = layout_chunk.layout(&Layout::vertical(
+      library_constraints(&app.user_config.behavior),
+    ));
 
     // Search input and help
     draw_library_block(f, app, library_area);

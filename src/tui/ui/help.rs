@@ -194,6 +194,31 @@ pub fn get_help_docs(app: &App) -> Vec<Vec<String>> {
       String::from("Global"),
     ],
     vec![
+      String::from("Decrease sidebar width"),
+      String::from("{"),
+      String::from("Layout"),
+    ],
+    vec![
+      String::from("Increase sidebar width"),
+      String::from("}"),
+      String::from("Layout"),
+    ],
+    vec![
+      String::from("Decrease playbar or library height (by focused pane)"),
+      String::from("("),
+      String::from("Layout"),
+    ],
+    vec![
+      String::from("Increase playbar or library height (by focused pane)"),
+      String::from(")"),
+      String::from("Layout"),
+    ],
+    vec![
+      String::from("Reset layout to defaults"),
+      String::from("|"),
+      String::from("Layout"),
+    ],
+    vec![
       String::from("Remove selected track from current playlist"),
       String::from("x"),
       String::from("Track table (playlist views)"),
