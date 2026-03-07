@@ -6,7 +6,7 @@ use crate::core::app::{
 };
 use anyhow::anyhow;
 use futures::stream::StreamExt;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use rspotify::model::{
   album::SimplifiedAlbum,
   artist::FullArtist,
@@ -142,7 +142,7 @@ impl MetadataNetwork for Network {
 
   async fn get_album(&mut self, album_id: AlbumId<'static>) {
     debug!("get_album: album_id={}", album_id.id());
-    match self.spotify.album(album_id, None).await {
+    match self.spotify.album(album_id.clone(), None).await {
       Ok(album) => {
         let mut app = self.app.lock().await;
         app.selected_album_full = Some(crate::core::app::SelectedFullAlbum {
@@ -365,7 +365,7 @@ impl MetadataNetwork for Network {
 
   async fn get_album_for_track(&mut self, track_id: TrackId<'static>) {
     debug!("get_album_for_track: track_id={}", track_id.id());
-    match self.spotify.track(track_id, None).await {
+    match self.spotify.track(track_id.clone(), None).await {
       Ok(track) => {
         // FullTrack.album is SimplifiedAlbum (not Option) in rspotify 0.14
         let album = track.album;

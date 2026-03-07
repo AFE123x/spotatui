@@ -98,14 +98,15 @@ pub async fn spotify_api_request_json_for(
         return Err(anyhow!("Spotify API request failed: {}", e));
       }
     };
-    if response.status().is_success() {
+    let status = response.status();
+    if status.is_success() {
       let response_body = response.text().await?;
       let dur = started_at.elapsed();
       debug!(
         "Spotify API success {} {} status={} duration_ms={}",
         method,
         url,
-        response.status(),
+        status,
         dur.as_millis()
       );
       if response_body.trim().is_empty() {
@@ -114,7 +115,6 @@ pub async fn spotify_api_request_json_for(
       return Ok(serde_json::from_str(&response_body)?);
     }
 
-    let status = response.status();
 
     if status == reqwest::StatusCode::UNAUTHORIZED && !refreshed_after_unauthorized {
       warn!(
