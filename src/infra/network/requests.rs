@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use log::{debug, error, info, warn};
 use reqwest::Method;
 use rspotify::clients::BaseClient;
 use rspotify::AuthCodePkceSpotify;
@@ -9,7 +10,6 @@ use std::{
   time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
-use log::{debug, error, info, warn};
 
 static SPOTIFY_API_PACING: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 const SPOTIFY_API_MIN_INTERVAL: Duration = Duration::from_millis(250);
@@ -42,7 +42,10 @@ pub async fn spotify_api_request_json_for(
       qp.append_pair(k, v);
     }
   }
-  debug!("Spotify API request prepared: {} {} query={:?}", method, url, query);
+  debug!(
+    "Spotify API request prepared: {} {} query={:?}",
+    method, url, query
+  );
 
   let started_at = Instant::now();
 
@@ -71,14 +74,23 @@ pub async fn spotify_api_request_json_for(
       request = request.json(&payload);
     }
 
-    debug!("Spotify API request sending (attempt {}): {} {}", attempt + 1, method, url);
+    debug!(
+      "Spotify API request sending (attempt {}): {} {}",
+      attempt + 1,
+      method,
+      url
+    );
     let response = match request.send().await {
       Ok(response) => response,
       Err(e) => {
         error!("Spotify API send error for {} {}: {}", method, url, e);
         if attempt + 1 < max_attempts && (e.is_connect() || e.is_timeout() || e.is_request()) {
           let backoff_secs = 1 + u64::from(attempt);
-          warn!("Transient network error, retrying after {}s (attempt {})", backoff_secs, attempt + 1);
+          warn!(
+            "Transient network error, retrying after {}s (attempt {})",
+            backoff_secs,
+            attempt + 1
+          );
           tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
           attempt += 1;
           continue;
@@ -89,7 +101,13 @@ pub async fn spotify_api_request_json_for(
     if response.status().is_success() {
       let response_body = response.text().await?;
       let dur = started_at.elapsed();
-      debug!("Spotify API success {} {} status={} duration_ms={}", method, url, response.status(), dur.as_millis());
+      debug!(
+        "Spotify API success {} {} status={} duration_ms={}",
+        method,
+        url,
+        response.status(),
+        dur.as_millis()
+      );
       if response_body.trim().is_empty() {
         return Ok(Value::Null);
       }
@@ -99,7 +117,10 @@ pub async fn spotify_api_request_json_for(
     let status = response.status();
 
     if status == reqwest::StatusCode::UNAUTHORIZED && !refreshed_after_unauthorized {
-      warn!("Spotify API returned 401 Unauthorized for {} {} - attempting token refresh", method, url);
+      warn!(
+        "Spotify API returned 401 Unauthorized for {} {} - attempting token refresh",
+        method, url
+      );
       match spotify.refresh_token().await {
         Ok(_) => {
           refreshed_after_unauthorized = true;
@@ -108,7 +129,10 @@ pub async fn spotify_api_request_json_for(
         }
         Err(refresh_err) => {
           let body = response.text().await.unwrap_or_default();
-          error!("Token refresh failed after 401 for {} {}: {}", method, url, refresh_err);
+          error!(
+            "Token refresh failed after 401 for {} {}: {}",
+            method, url, refresh_err
+          );
           return Err(anyhow!(
             "Spotify API {} failed: {} (token refresh failed: {})",
             status,
@@ -128,14 +152,22 @@ pub async fn spotify_api_request_json_for(
         .unwrap_or(1);
 
       let backoff_secs = retry_after_secs.max(1) + u64::from(attempt);
-      warn!("Rate limited by Spotify (429). retry-after={}s; backing off {}s (attempt {})", retry_after_secs, backoff_secs, attempt + 1);
+      warn!(
+        "Rate limited by Spotify (429). retry-after={}s; backing off {}s (attempt {})",
+        retry_after_secs,
+        backoff_secs,
+        attempt + 1
+      );
       tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
       attempt += 1;
       continue;
     }
 
     let body = response.text().await.unwrap_or_default();
-    error!("Spotify API request failed: {} {} status={} body={}", method, url, status, body);
+    error!(
+      "Spotify API request failed: {} {} status={} body={}",
+      method, url, status, body
+    );
     return Err(anyhow!("Spotify API {} failed: {}", status, body));
   }
 }

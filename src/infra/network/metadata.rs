@@ -6,6 +6,7 @@ use crate::core::app::{
 };
 use anyhow::anyhow;
 use futures::stream::StreamExt;
+use log::{debug, error, info, warn};
 use rspotify::model::{
   album::SimplifiedAlbum,
   artist::FullArtist,
@@ -17,7 +18,6 @@ use rspotify::model::{
 };
 use rspotify::prelude::*;
 use tokio::try_join;
-use log::{debug, error, info, warn};
 
 pub trait MetadataNetwork {
   async fn get_artist(
@@ -48,7 +48,10 @@ impl MetadataNetwork for Network {
     country: Option<Country>,
   ) {
     let artist_id_str = artist_id.id().to_string();
-    debug!("get_artist: id={} name={} country={:?}", artist_id_str, input_artist_name, country);
+    debug!(
+      "get_artist: id={} name={} country={:?}",
+      artist_id_str, input_artist_name, country
+    );
     let market = country.map(Market::Country);
     let top_tracks_req = self.spotify.artist_top_tracks(artist_id.clone(), market);
     // rspotify 0.14 artist_related_artists is not deprecated or we suppress
@@ -77,7 +80,10 @@ impl MetadataNetwork for Network {
       })
     };
 
-    debug!("get_artist: dispatching top_tracks, related_artists and albums requests for {}", artist_id_str);
+    debug!(
+      "get_artist: dispatching top_tracks, related_artists and albums requests for {}",
+      artist_id_str
+    );
     let res = try_join!(top_tracks_req, related_artists_req, albums_fut);
 
     match res {
@@ -171,7 +177,11 @@ impl MetadataNetwork for Network {
     {
       Ok(episodes) => {
         if !episodes.items.is_empty() {
-          debug!("get_show_episodes: fetched {} episodes for show {}", episodes.items.len(), show_id.id());
+          debug!(
+            "get_show_episodes: fetched {} episodes for show {}",
+            episodes.items.len(),
+            show_id.id()
+          );
           let mut app = self.app.lock().await;
           app.library.show_episodes = ScrollableResultPages::new();
           app.library.show_episodes.add_pages(episodes);
@@ -182,7 +192,10 @@ impl MetadataNetwork for Network {
 
           app.push_navigation_stack(RouteId::PodcastEpisodes, ActiveBlock::EpisodeTable);
         } else {
-          debug!("get_show_episodes: no episodes returned for show {}", show_id.id());
+          debug!(
+            "get_show_episodes: no episodes returned for show {}",
+            show_id.id()
+          );
         }
       }
       Err(e) => {
@@ -218,7 +231,11 @@ impl MetadataNetwork for Network {
 
   async fn get_current_show_episodes(&mut self, show_id: ShowId<'static>, offset: Option<u32>) {
     let path = format!("shows/{}/episodes", show_id.id());
-    debug!("get_current_show_episodes: show_id={} offset={:?}", show_id.id(), offset);
+    debug!(
+      "get_current_show_episodes: show_id={} offset={:?}",
+      show_id.id(),
+      offset
+    );
     let mut query = vec![("limit", self.large_search_limit.to_string())];
     if let Some(offset) = offset {
       query.push(("offset", offset.to_string()));
@@ -233,13 +250,21 @@ impl MetadataNetwork for Network {
     {
       Ok(episodes) => {
         if !episodes.items.is_empty() {
-          debug!("get_current_show_episodes: adding {} episodes for show {}", episodes.items.len(), show_id.id());
+          debug!(
+            "get_current_show_episodes: adding {} episodes for show {}",
+            episodes.items.len(),
+            show_id.id()
+          );
           let mut app = self.app.lock().await;
           app.library.show_episodes.add_pages(episodes);
         }
       }
       Err(e) => {
-        error!("get_current_show_episodes failed for {}: {:?}", show_id.id(), e);
+        error!(
+          "get_current_show_episodes failed for {}: {:?}",
+          show_id.id(),
+          e
+        );
         self.handle_error(anyhow!(e)).await;
       }
     }
@@ -255,7 +280,10 @@ impl MetadataNetwork for Network {
       .await
     {
       Ok(artists_page) => {
-        debug!("get_followed_artists: got page with {} artists", artists_page.items.len());
+        debug!(
+          "get_followed_artists: got page with {} artists",
+          artists_page.items.len()
+        );
         let mut app = self.app.lock().await;
         app.library.saved_artists.add_pages(artists_page);
       }
@@ -267,7 +295,10 @@ impl MetadataNetwork for Network {
   }
 
   async fn user_unfollow_artists(&mut self, artist_ids: Vec<ArtistId<'static>>) {
-    debug!("user_unfollow_artists: ids={:?}", artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>());
+    debug!(
+      "user_unfollow_artists: ids={:?}",
+      artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>()
+    );
     match self.spotify.user_unfollow_artists(artist_ids).await {
       Ok(_) => {
         info!("user_unfollow_artists: success");
@@ -280,7 +311,10 @@ impl MetadataNetwork for Network {
   }
 
   async fn user_follow_artists(&mut self, artist_ids: Vec<ArtistId<'static>>) {
-    debug!("user_follow_artists: ids={:?}", artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>());
+    debug!(
+      "user_follow_artists: ids={:?}",
+      artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>()
+    );
     match self.spotify.user_follow_artists(artist_ids).await {
       Ok(_) => {
         info!("user_follow_artists: success");
@@ -293,7 +327,10 @@ impl MetadataNetwork for Network {
   }
 
   async fn user_artist_check_follow(&mut self, artist_ids: Vec<ArtistId<'static>>) {
-    debug!("user_artist_check_follow: ids={:?}", artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>());
+    debug!(
+      "user_artist_check_follow: ids={:?}",
+      artist_ids.iter().map(|id| id.id()).collect::<Vec<_>>()
+    );
     match self
       .spotify
       .user_artist_check_follow(artist_ids.clone())
@@ -308,7 +345,10 @@ impl MetadataNetwork for Network {
               .insert(artist_ids[i].id().to_string());
           }
         }
-        info!("user_artist_check_follow: {} followed", app.followed_artist_ids_set.len());
+        info!(
+          "user_artist_check_follow: {} followed",
+          app.followed_artist_ids_set.len()
+        );
       }
       Err(e) => {
         error!("user_artist_check_follow failed: {:?}", e);
@@ -329,7 +369,10 @@ impl MetadataNetwork for Network {
       Ok(track) => {
         // FullTrack.album is SimplifiedAlbum (not Option) in rspotify 0.14
         let album = track.album;
-        info!("get_album_for_track: resolved album id={}", album.id.as_ref().map(|i| i.id()).unwrap_or_default());
+        info!(
+          "get_album_for_track: resolved album id={}",
+          album.id.as_ref().map(|i| i.id()).unwrap_or_default()
+        );
         self.get_album_tracks(Box::new(album)).await;
       }
       Err(e) => {
